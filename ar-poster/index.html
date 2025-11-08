@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <title>Location AR Poster</title>
+
+  <!-- A-Frame -->
+  <script src="https://aframe.io/releases/1.4.1/aframe.min.js"></script>
+  <!-- AR.js（Location Based対応版）-->
+  <script src="https://cdn.jsdelivr.net/npm/ar-js-org@3.4.5/aframe/build/aframe-ar-nft.js"></script>
+
+  <style>
+    body { margin: 0; overflow: hidden; }
+    #info {
+      position: absolute;
+      top: 10px; left: 10px;
+      padding: 6px 10px;
+      background: rgba(0,0,0,0.6);
+      color: #fff;
+      font-size: 11px;
+      z-index: 20;
+      max-width: 280px;
+      line-height: 1.4;
+    }
+    #panel {
+      position: absolute;
+      bottom: 10px; left: 10px;
+      padding: 6px 8px;
+      background: rgba(0,0,0,0.7);
+      color: #fff;
+      font-size: 10px;
+      z-index: 20;
+      max-width: 280px;
+    }
+    #panel input {
+      width: 60px;
+      font-size: 10px;
+      margin-left: 4px;
+    }
+    #panel button {
+      margin-top: 4px;
+      font-size: 10px;
+      padding: 2px 6px;
+    }
+  </style>
+</head>
+<body>
+
+<div id="info">
+  共通ARページです。<br>
+  指定地点の近くでカメラをかざすとポスターが表示されます。<br>
+  初回は「位置情報」と「カメラ」を許可してください。
+</div>
+
+<!-- 調整用パネル（現場確認時のみ使用） -->
+<div id="panel">
+  <div>現在位置: <span id="userPos">--</span></div>
+  <div>ポスター位置: <span id="posterPos">--</span></div>
+  <div>距離: <span id="dist">--</span> m</div>
+  <div>
+    高さ(m):
+    <input type="number" id="heightInput" step="0.1" value="2">
+    回転(°Y):
+    <input type="number" id="rotInput" step="1" value="180">
+  </div>
+  <div>
+    表示範囲(m):
+    <input type="number" id="rangeInput" step="1" value="30">
+  </div>
+  <button id="setHereBtn">今の位置をポスター位置にする</button><br>
+  <small>現場で数値を調整して、最終値をこのHTML上部の設定に書き込んで固定します。</small>
+</div>
+
+<a-scene
+  vr-mode-ui="enabled: false"
+  embedded
+  renderer="logarithmicDepthBuffer: true"
+  arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;"
+>
+  <a-entity id="posters-root"></a-entity>
+  <a-entity gps-camera rotation-reader></a-entity>
+</a-scene>
+
+<script>
+  // ========= 基本設定 =========
+  const posterConfig = {
+    lat: 35.72047743295264,    // ★あなたの指定した緯度
+    lon: 139.7651500172735,    // ★あなたの指定した経度
+    img: "images/poster1.jpg", // ★GitHub内に置くポスター画像
+    rotY: 180,                 // 初期向き（必要に応じて調整）
+    range: 30,                 // 30m以内で表示
+    height: 2,                 // 地面から2mの高さ
+    scale: "5 3 1"             // 大きさ
+  };
+  // ===========================
+
+  const root = document.getElementById('posters-root');
+
+  // ポスターEntity生成
+  const posterEl = document.createElement('a-image');
+  posterEl.setAttribute('src', posterConfig.img);
+  posterEl.setAttribute('gps-entity-place',
+    `latitude: ${posterConfig.lat}; longitude: ${posterConfig.lon};`
+  );
+  posterEl.setAttribute('rotation', `0 ${posterConfig.rotY} 0`);
+  posterEl.setAttribute('position', `0 ${posterConfig.height} 0`);
+  posterEl.setAttribute('scale', posterConfig.scale);
+  posterEl.setAttribute('visible', 'false');
+  root.appendChild(posterEl);
+
+  // 調整UI関連
+  const userPosSpan = document.getElementById('userPos');
+  const posterPosSpan = document.getElementById('posterPos');
+  const distSpan = document.getElementById('dist');
+  const heightInput = document.getElementById('heightInput');
+  const rotInput = document.getElementById('rotInput');
+  const rangeInput = document.getElementById('rangeInput');
+  const setHereBtn = document.getElementById('setHereBtn');
+
+  posterPosSpan.textContent =
+    `${posterConfig.lat.toFixed(6)}, ${posterConfig.lon.toFixed(6)}`;
+  heightInput.value = posterConfig.height;
+  rotInput.value = posterConfig.rotY;
+  rangeInput.value = posterConfig.range;
+
+  let lastUserPos = null;
+
+  function distanceMeters(lat1, lon1, lat2, lon2) {
+    const R = 6371000;
+    const toRad = x => x * Math.PI / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a =
+      Math.sin(dLat/2) ** 2 +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+      Math.sin(dLon/2) ** 2;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  }
+
+  window.addEventListener('gps-camera-update-position', (e) => {
+    const { latitude, longitude, accuracy } = e.detail.position;
+    lastUserPos = { lat: latitude, lon: longitude, accuracy };
+    userPosSpan.textContent =
+      `${latitude.toFixed(6)}, ${longitude.toFixed(6)} (±${Math.round(accuracy)}m)`;
+    const d = distanceMeters(latitude, longitude, posterConfig.lat, posterConfig.lon);
+    distSpan.textContent = isFinite(d) ? Math.round(d) : '--';
+    const shouldShow = d <= posterConfig.range;
+    posterEl.setAttribute('visible', shouldShow ? 'true' : 'false');
+  });
+
+  heightInput.addEventListener('change', () => {
+    posterConfig.height = parseFloat(heightInput.value) || 0;
+    posterEl.setAttribute('position', `0 ${posterConfig.height} 0`);
+  });
+
+  rotInput.addEventListener('change', () => {
+    posterConfig.rotY = parseFloat(rotInput.value) || 0;
+    posterEl.setAttribute('rotation', `0 ${posterConfig.rotY} 0`);
+  });
+
+  rangeInput.addEventListener('change', () => {
+    posterConfig.range = parseFloat(rangeInput.value) || 1;
+  });
+
+  setHereBtn.addEventListener('click', () => {
+    if (!lastUserPos) {
+      alert('位置情報取得中です。数秒待ってから再度お試しください。');
+      return;
+    }
+    posterConfig.lat = lastUserPos.lat;
+    posterConfig.lon = lastUserPos.lon;
+    posterPosSpan.textContent =
+      `${posterConfig.lat.toFixed(6)}, ${posterConfig.lon.toFixed(6)}`;
+    posterEl.setAttribute('gps-entity-place',
+      `latitude: ${posterConfig.lat}; longitude: ${posterConfig.lon};`
+    );
+  });
+</script>
+</body>
+</html>
