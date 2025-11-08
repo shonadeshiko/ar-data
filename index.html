@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>位置情報AR - 度数法版</title>
+  <title>位置情報AR - レーダー付き</title>
   <style>
     body { 
       margin: 0; 
@@ -32,17 +32,43 @@
       z-index: 2;
       pointer-events: none;
     }
+    #radar {
+      position: fixed;
+      top: 70px;
+      right: 10px;
+      width: 180px;
+      height: 180px;
+      background: rgba(0,0,0,0.85);
+      border: 3px solid #0f0;
+      border-radius: 50%;
+      z-index: 1000;
+    }
     #info {
       position: fixed;
       top: 10px;
       left: 10px;
       background: rgba(0,0,0,0.85);
       color: white;
-      padding: 12px;
+      padding: 10px;
       border-radius: 5px;
       z-index: 1000;
-      font-size: 12px;
-      max-width: 320px;
+      font-size: 11px;
+      max-width: 180px;
+    }
+    #nearest-info {
+      position: fixed;
+      top: 260px;
+      right: 10px;
+      background: rgba(255,100,0,0.95);
+      color: white;
+      padding: 15px;
+      border-radius: 10px;
+      z-index: 1000;
+      font-size: 14px;
+      font-weight: bold;
+      text-align: center;
+      min-width: 180px;
+      display: none;
     }
     #start-button {
       position: fixed;
@@ -58,26 +84,9 @@
       cursor: pointer;
       z-index: 2000;
     }
-    #controls {
-      position: fixed;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(0,0,0,0.85);
-      color: white;
-      padding: 15px;
-      border-radius: 10px;
-      z-index: 1000;
-      text-align: center;
-    }
-    #controls input {
-      width: 150px;
-      margin: 5px;
-    }
-    .status { font-size: 11px; margin: 3px 0; }
+    .status { font-size: 10px; margin: 2px 0; }
     .ok { color: #0f0; }
-    .error { color: #f00; }
-    .value { color: #4af; font-weight: bold; }
+    .value { color: #4af; }
   </style>
 </head>
 <body>
@@ -89,31 +98,20 @@
   </div>
   
   <canvas id="ar-canvas"></canvas>
+  <canvas id="radar"></canvas>
   
   <div id="info">
-    <div><strong>📱 位置情報AR（度数法）</strong></div>
-    <div id="camera-status" class="status">📷 カメラ: 待機中</div>
+    <div><strong>📱 AR実験版</strong></div>
     <div id="gps-status" class="status">📍 GPS: 待機中</div>
-    <div id="gyro-status" class="status">🧭 ジャイロ: 待機中</div>
-    <hr style="border-color: rgba(255,255,255,0.3); margin: 8px 0;">
-    <div class="status">位置: <span id="pos" class="value">--</span></div>
-    <div class="status">向き: <span id="heading" class="value">--</span>°</div>
-    <div class="status">表示範囲: <span id="range-display" class="value">0.003</span>° (≈300m)</div>
-    <div class="status">最寄り: <span id="nearest" class="value">--</span></div>
-    <div class="status">距離: <span id="dist" class="value">--</span>° (<span id="dist-m">--</span>m)</div>
-    <div class="status">表示中: <span id="visible-count" class="value">0</span>/11</div>
+    <div class="status">範囲: <span class="value">0.003°</span></div>
+    <div class="status">表示: <span id="visible-count" class="value">0</span>/11</div>
   </div>
 
-  <div id="controls" style="display: none;">
-    <div style="margin-bottom: 10px;"><strong>⚙️ 表示範囲調整</strong></div>
-    <div>
-      <label>範囲（度）:</label><br>
-      <input type="range" id="range-slider" min="0.0001" max="0.01" step="0.0001" value="0.003">
-      <span id="range-value">0.003</span>°
-    </div>
-    <div style="margin-top: 5px; font-size: 11px; color: #aaa;">
-      0.001° ≈ 100m | 0.003° ≈ 300m | 0.01° ≈ 1km
-    </div>
+  <div id="nearest-info">
+    <div style="font-size: 20px; margin-bottom: 5px;">📍 最寄りポスター</div>
+    <div id="nearest-num" style="font-size: 32px; margin: 10px 0;">--</div>
+    <div id="nearest-direction" style="font-size: 18px; margin: 5px 0;">--</div>
+    <div id="nearest-distance" style="font-size: 16px;">距離: --</div>
   </div>
 
   <script>
@@ -123,7 +121,7 @@
       {id: 3, lat: 35.720987, lon: 139.764194, ele: 2.82, color: '#FFFF00'},
       {id: 4, lat: 35.720798, lon: 139.764362, ele: 3.08, color: '#7FFF00'},
       {id: 5, lat: 35.720655, lon: 139.764665, ele: 2.97, color: '#00FF00'},
-      {id: 6, lat: 35.72042263035527,  lon: 139.76515295157975, ele: 2.6, color: '#00FF7F'},
+      {id: 6, lat: 35.720462, lon: 139.765279, ele: 2.6, color: '#00FF7F'},
       {id: 7, lat: 35.720311, lon: 139.765584, ele: 2.62, color: '#00FFFF'},
       {id: 8, lat: 35.720145, lon: 139.765950, ele: 2.7, color: '#007FFF'},
       {id: 9, lat: 35.719991, lon: 139.766207, ele: 2.73, color: '#0000FF'},
@@ -134,27 +132,22 @@
     let userLat = null;
     let userLon = null;
     let heading = 0;
-    let canvas, ctx;
-    let displayRange = 0.003; // 表示範囲（度）
+    let canvas, ctx, radarCanvas, radarCtx;
+    const displayRange = 0.003;
     
-    // この地点（北緯35.72度）での1度あたりの距離
-    const LAT_METER_PER_DEGREE = 111000; // 緯度1度 ≈ 111km
-    const LON_METER_PER_DEGREE = 90000;  // 経度1度 ≈ 90km (cos(35.72°) ≈ 0.81)
+    const LAT_METER_PER_DEGREE = 111000;
+    const LON_METER_PER_DEGREE = 90000;
     
-    // 度数で距離計算（平面近似）
     function calculateDistanceDegree(lat1, lon1, lat2, lon2) {
       const dLat = lat2 - lat1;
       const dLon = lon2 - lon1;
-      // 平面直角座標的な距離（度）
       return Math.sqrt(dLat * dLat + dLon * dLon);
     }
     
-    // 度をメートルに変換（概算）
     function degreeToMeter(degree) {
       return degree * Math.sqrt(LAT_METER_PER_DEGREE * LON_METER_PER_DEGREE);
     }
     
-    // 方位角計算（北が0度）
     function calculateBearing(lat1, lon1, lat2, lon2) {
       const dLon = lon2 - lon1;
       const dLat = lat2 - lat1;
@@ -162,69 +155,61 @@
       return (θ * 180 / Math.PI + 360) % 360;
     }
 
-    // 範囲スライダー
-    document.getElementById('range-slider').addEventListener('input', (e) => {
-      displayRange = parseFloat(e.target.value);
-      document.getElementById('range-value').textContent = displayRange.toFixed(4);
-      document.getElementById('range-display').textContent = displayRange.toFixed(4);
-      updateInfo();
-    });
+    function getDirectionText(bearing) {
+      const directions = ['北', '北東', '東', '南東', '南', '南西', '西', '北西'];
+      const index = Math.round(bearing / 45) % 8;
+      return directions[index];
+    }
 
-    // 開始ボタン
     document.getElementById('start-button').addEventListener('click', async () => {
       document.getElementById('start-button').style.display = 'none';
-      document.getElementById('controls').style.display = 'block';
       await startAR();
     });
 
     async function startAR() {
-      // 1. カメラ起動
+      // カメラ起動
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: 'environment', width: 1280, height: 720 }
         });
         const video = document.getElementById('camera-feed');
         video.srcObject = stream;
-        document.getElementById('camera-status').innerHTML = '📷 <span class="ok">カメラ: 起動</span>';
-        console.log('カメラ起動成功');
       } catch (err) {
-        document.getElementById('camera-status').innerHTML = `📷 <span class="error">カメラ: ${err.message}</span>`;
-        console.error('カメラエラー:', err);
+        alert('カメラエラー: ' + err.message);
         return;
       }
 
-      // 2. Canvas初期化
+      // Canvas初期化
       canvas = document.getElementById('ar-canvas');
       ctx = canvas.getContext('2d');
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
 
-      // 3. GPS開始
+      // レーダー初期化
+      radarCanvas = document.getElementById('radar');
+      radarCtx = radarCanvas.getContext('2d');
+      const size = 180;
+      radarCanvas.width = size;
+      radarCanvas.height = size;
+
+      // GPS開始
       if (navigator.geolocation) {
         navigator.geolocation.watchPosition((position) => {
           userLat = position.coords.latitude;
           userLon = position.coords.longitude;
-          document.getElementById('pos').textContent = 
-            `${userLat.toFixed(6)}, ${userLon.toFixed(6)}`;
-          document.getElementById('gps-status').innerHTML = '📍 <span class="ok">GPS: 取得中</span>';
+          document.getElementById('gps-status').innerHTML = '📍 <span class="ok">GPS: OK</span>';
           updateInfo();
         }, (err) => {
-          document.getElementById('gps-status').innerHTML = `📍 <span class="error">GPS: ${err.message}</span>`;
+          document.getElementById('gps-status').innerHTML = `📍 GPS: ${err.message}`;
         }, { enableHighAccuracy: true, maximumAge: 0 });
       }
 
-      // 4. ジャイロスコープ
+      // ジャイロスコープ
       if (window.DeviceOrientationEvent) {
         if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-          try {
-            const permission = await DeviceOrientationEvent.requestPermission();
-            if (permission === 'granted') {
-              startOrientation();
-            }
-          } catch (err) {
-            console.log('ジャイロ許可エラー:', err);
-            startOrientation();
-          }
+          DeviceOrientationEvent.requestPermission().then(permission => {
+            if (permission === 'granted') startOrientation();
+          }).catch(() => startOrientation());
         } else {
           startOrientation();
         }
@@ -234,75 +219,156 @@
         window.addEventListener('deviceorientationabsolute', (event) => {
           if (event.absolute && event.alpha !== null) {
             heading = 360 - event.alpha;
-            document.getElementById('heading').textContent = Math.round(heading);
-            document.getElementById('gyro-status').innerHTML = '🧭 <span class="ok">ジャイロ: 動作中</span>';
           }
         });
-        
         window.addEventListener('deviceorientation', (event) => {
           if (event.alpha !== null) {
             heading = 360 - event.alpha;
-            document.getElementById('heading').textContent = Math.round(heading);
-            document.getElementById('gyro-status').innerHTML = '🧭 <span class="ok">ジャイロ: 動作中</span>';
           }
         });
       }
 
-      // 5. 描画ループ
+      // 描画ループ
       function draw() {
-        if (!userLat || !userLon) {
-          requestAnimationFrame(draw);
-          return;
+        drawRadar();
+        drawAR();
+        requestAnimationFrame(draw);
+      }
+
+      function drawRadar() {
+        if (!userLat || !userLon) return;
+
+        const size = radarCanvas.width;
+        const centerX = size / 2;
+        const centerY = size / 2;
+        const radius = size / 2 - 10;
+
+        // 背景クリア
+        radarCtx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+        radarCtx.fillRect(0, 0, size, size);
+
+        // グリッド円
+        radarCtx.strokeStyle = 'rgba(0, 255, 0, 0.3)';
+        radarCtx.lineWidth = 1;
+        for (let i = 1; i <= 3; i++) {
+          radarCtx.beginPath();
+          radarCtx.arc(centerX, centerY, radius * i / 3, 0, Math.PI * 2);
+          radarCtx.stroke();
         }
+
+        // 方位線（北）
+        radarCtx.strokeStyle = 'rgba(255, 0, 0, 0.8)';
+        radarCtx.lineWidth = 2;
+        radarCtx.beginPath();
+        radarCtx.moveTo(centerX, centerY);
+        radarCtx.lineTo(centerX, centerY - radius);
+        radarCtx.stroke();
+
+        // 北マーク
+        radarCtx.fillStyle = '#ff0000';
+        radarCtx.font = 'bold 14px sans-serif';
+        radarCtx.textAlign = 'center';
+        radarCtx.fillText('N', centerX, 20);
+
+        // 自分（中心）
+        radarCtx.fillStyle = '#00ffff';
+        radarCtx.beginPath();
+        radarCtx.arc(centerX, centerY, 5, 0, Math.PI * 2);
+        radarCtx.fill();
+
+        // ポスター
+        let nearest = null;
+        let minDistance = Infinity;
+
+        posters.forEach(poster => {
+          const distanceDeg = calculateDistanceDegree(userLat, userLon, poster.lat, poster.lon);
+          if (distanceDeg > displayRange) return;
+
+          const bearing = calculateBearing(userLat, userLon, poster.lat, poster.lon);
+          const angle = (bearing - 90) * Math.PI / 180; // 北を上に
+          
+          // 正規化（レーダーのスケール）
+          const normalizedDist = (distanceDeg / displayRange) * radius;
+          const x = centerX + normalizedDist * Math.cos(angle);
+          const y = centerY + normalizedDist * Math.sin(angle);
+
+          // ポスター描画
+          radarCtx.fillStyle = poster.color;
+          radarCtx.beginPath();
+          radarCtx.arc(x, y, 6, 0, Math.PI * 2);
+          radarCtx.fill();
+          
+          // 枠線
+          radarCtx.strokeStyle = '#ffffff';
+          radarCtx.lineWidth = 2;
+          radarCtx.stroke();
+
+          // 番号
+          radarCtx.fillStyle = '#ffffff';
+          radarCtx.font = 'bold 10px sans-serif';
+          radarCtx.textAlign = 'center';
+          radarCtx.textBaseline = 'middle';
+          radarCtx.fillText(poster.id, x, y);
+
+          // 最寄り判定
+          if (distanceDeg < minDistance) {
+            minDistance = distanceDeg;
+            nearest = poster;
+          }
+        });
+
+        // 最寄り情報表示
+        if (nearest) {
+          const bearing = calculateBearing(userLat, userLon, nearest.lat, nearest.lon);
+          const direction = getDirectionText(bearing);
+          const distanceM = degreeToMeter(minDistance);
+
+          document.getElementById('nearest-info').style.display = 'block';
+          document.getElementById('nearest-num').textContent = `${nearest.id}番`;
+          document.getElementById('nearest-direction').textContent = `${direction} ${Math.round(bearing)}°`;
+          document.getElementById('nearest-distance').textContent = `距離: ${distanceM.toFixed(0)}m`;
+        }
+      }
+
+      function drawAR() {
+        if (!userLat || !userLon) return;
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         const centerX = canvas.width / 2;
         const centerY = canvas.height / 2;
-        const viewAngle = 60; // 視野角（度）
+        const viewAngle = 60;
 
         posters.forEach(poster => {
-          // 度数で距離計算
           const distanceDeg = calculateDistanceDegree(userLat, userLon, poster.lat, poster.lon);
-          
-          // 表示範囲外は描画しない
           if (distanceDeg > displayRange) return;
 
           const bearing = calculateBearing(userLat, userLon, poster.lat, poster.lon);
           const angleDiff = ((bearing - heading + 540) % 360) - 180;
 
-          // 視野角内かチェック
           if (Math.abs(angleDiff) < viewAngle) {
             const screenX = centerX + (angleDiff / viewAngle) * canvas.width;
-            
-            // 距離に応じてサイズを調整（度数ベース）
             const size = Math.max(40, 0.003 / distanceDeg * 150);
             const screenY = centerY - (size / 2);
 
-            // ポスターを描画
             ctx.fillStyle = poster.color;
             ctx.fillRect(screenX - size/2, screenY - size/2, size, size * 1.5);
             
-            // 枠線
             ctx.strokeStyle = '#FFFFFF';
             ctx.lineWidth = 3;
             ctx.strokeRect(screenX - size/2, screenY - size/2, size, size * 1.5);
 
-            // 番号
             ctx.fillStyle = '#FFFFFF';
             ctx.font = `bold ${size/2}px sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(poster.id, screenX, screenY);
 
-            // 距離表示（度とメートル）
             ctx.font = `${size/4}px sans-serif`;
             const distanceM = degreeToMeter(distanceDeg);
             ctx.fillText(`${distanceM.toFixed(0)}m`, screenX, screenY + size);
           }
         });
-
-        requestAnimationFrame(draw);
       }
 
       draw();
@@ -311,28 +377,15 @@
     function updateInfo() {
       if (!userLat || !userLon) return;
 
-      let nearest = null;
-      let minDistance = Infinity;
       let visibleCount = 0;
-
       posters.forEach(poster => {
         const distanceDeg = calculateDistanceDegree(userLat, userLon, poster.lat, poster.lon);
-        if (distanceDeg < minDistance) {
-          minDistance = distanceDeg;
-          nearest = poster;
-        }
         if (distanceDeg < displayRange) visibleCount++;
       });
 
-      if (nearest) {
-        document.getElementById('nearest').textContent = `${nearest.id}番`;
-        document.getElementById('dist').textContent = minDistance.toFixed(6);
-        document.getElementById('dist-m').textContent = degreeToMeter(minDistance).toFixed(1);
-      }
       document.getElementById('visible-count').textContent = visibleCount;
     }
 
-    // リサイズ対応
     window.addEventListener('resize', () => {
       if (canvas) {
         canvas.width = window.innerWidth;
