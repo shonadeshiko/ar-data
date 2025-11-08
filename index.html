@@ -8,7 +8,6 @@
     body { 
       margin: 0; 
       overflow: hidden;
-      font-family: sans-serif;
     }
     #video-container {
       position: fixed;
@@ -23,58 +22,14 @@
       height: 100%;
       object-fit: cover;
     }
-    #poster-container {
+    #ar-canvas {
       position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
       z-index: 2;
-      display: none;
-    }
-    #poster-image {
-      max-width: 80vw;
-      max-height: 60vh;
-      box-shadow: 0 0 30px rgba(255,255,0,0.8);
-      border: 4px solid #FFFF00;
-      border-radius: 10px;
-    }
-    #poster-info {
-      position: absolute;
-      top: -50px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(255,200,0,0.95);
-      color: #000;
-      padding: 10px 20px;
-      border-radius: 20px;
-      font-size: 24px;
-      font-weight: bold;
-      white-space: nowrap;
-    }
-    #info {
-      position: fixed;
-      top: 10px;
-      left: 10px;
-      background: rgba(0,0,0,0.85);
-      color: white;
-      padding: 12px;
-      border-radius: 8px;
-      z-index: 1000;
-      font-size: 12px;
-      max-width: 300px;
-    }
-    #distance-info {
-      position: fixed;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(0,0,0,0.85);
-      color: white;
-      padding: 15px 25px;
-      border-radius: 10px;
-      z-index: 1000;
-      font-size: 16px;
-      text-align: center;
+      pointer-events: none;
     }
     #start-button {
       position: fixed;
@@ -89,11 +44,8 @@
       border-radius: 10px;
       cursor: pointer;
       z-index: 2000;
+      font-family: sans-serif;
     }
-    .status { margin: 3px 0; }
-    .ok { color: #0f0; }
-    .highlight { color: #ff0; font-weight: bold; }
-    .distance { font-size: 20px; color: #0ff; font-weight: bold; }
   </style>
 </head>
 <body>
@@ -104,48 +56,38 @@
     <video id="camera-feed" autoplay playsinline></video>
   </div>
   
-  <div id="poster-container">
-    <div id="poster-info">ポスター --</div>
-    <img id="poster-image" src="poster.jpg" alt="Poster">
-  </div>
-  
-  <div id="info">
-    <div class="status">📍 GPS: <span id="gps-status">待機中</span></div>
-    <div class="status">現在位置: <span id="current-pos">--</span></div>
-    <div class="status">更新: <span id="update-count">0</span>回</div>
-  </div>
-
-  <div id="distance-info">
-    <div style="margin-bottom: 5px;">最寄りポスター</div>
-    <div><span id="nearest-id" class="highlight">--</span></div>
-    <div class="distance"><span id="nearest-distance">--</span>m</div>
-    <div style="font-size: 12px; margin-top: 5px;">
-      <span id="visibility-status">範囲外</span>
-    </div>
-  </div>
+  <canvas id="ar-canvas"></canvas>
 
   <script>
+    // 11箇所のポスター座標（高さ情報付き）
     const posters = [
-      {id: 1, lat: 35.720533, lon: 139.762619},
-      {id: 2, lat: 35.720446, lon: 139.763486},
-      {id: 3, lat: 35.720987, lon: 139.764194},
-      {id: 4, lat: 35.720798, lon: 139.764362},
-      {id: 5, lat: 35.720655, lon: 139.764665},
-      {id: 6, lat: 35.720462, lon: 139.765279},
-      {id: 7, lat: 35.720311, lon: 139.765584},
-      {id: 8, lat: 35.720145, lon: 139.765950},
-      {id: 9, lat: 35.719991, lon: 139.766207},
-      {id: 10, lat: 35.719865, lon: 139.766525},
-      {id: 11, lat: 35.719580, lon: 139.766698}
+      {id: 1, lat: 35.720533, lon: 139.762619, height: 2.31},
+      {id: 2, lat: 35.720446, lon: 139.763486, height: 2.72},
+      {id: 3, lat: 35.720987, lon: 139.764194, height: 2.82},
+      {id: 4, lat: 35.720798, lon: 139.764362, height: 3.08},
+      {id: 5, lat: 35.720655, lon: 139.764665, height: 2.97},
+      {id: 6, lat: 35.720462, lon: 139.765279, height: 2.6},
+      {id: 7, lat: 35.720311, lon: 139.765584, height: 2.62},
+      {id: 8, lat: 35.720145, lon: 139.765950, height: 2.7},
+      {id: 9, lat: 35.719991, lon: 139.766207, height: 2.73},
+      {id: 10, lat: 35.719865, lon: 139.766525, height: 2.89},
+      {id: 11, lat: 35.719580, lon: 139.766698, height: 3.24}
     ];
 
     let userLat = null;
     let userLon = null;
-    let updateCount = 0;
-    let currentPoster = null;
+    let heading = 0;
+    let canvas, ctx;
+    let posterImage = null;
     
-    // 表示距離の閾値（度）
-    const DISPLAY_THRESHOLD = 0.00005; // 約30m以内
+    // ポスター画像を読み込み
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      posterImage = img;
+      console.log('✓ ポスター画像読み込み完了');
+    };
+    img.src = 'poster.jpg';
     
     // 度数での距離計算
     function calculateDistanceDegree(lat1, lon1, lat2, lon2) {
@@ -154,9 +96,12 @@
       return Math.sqrt(dLat * dLat + dLon * dLon);
     }
     
-    // 度をメートルに変換（概算）
-    function degreeToMeter(degree) {
-      return degree * 100000; // 北緯35度付近での概算
+    // 方位角計算（北を0度）
+    function calculateBearing(lat1, lon1, lat2, lon2) {
+      const dLon = lon2 - lon1;
+      const dLat = lat2 - lat1;
+      const θ = Math.atan2(dLon, dLat);
+      return (θ * 180 / Math.PI + 360) % 360;
     }
 
     document.getElementById('start-button').addEventListener('click', async () => {
@@ -178,87 +123,108 @@
         return;
       }
 
-      // GPS位置情報の監視
+      // Canvas初期化
+      canvas = document.getElementById('ar-canvas');
+      ctx = canvas.getContext('2d');
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+
+      // GPS開始
       if (navigator.geolocation) {
         navigator.geolocation.watchPosition((position) => {
           userLat = position.coords.latitude;
           userLon = position.coords.longitude;
-          updateCount++;
-          
-          document.getElementById('gps-status').innerHTML = '<span class="ok">取得中</span>';
-          document.getElementById('current-pos').textContent = 
-            `${userLat.toFixed(6)}, ${userLon.toFixed(6)}`;
-          document.getElementById('update-count').textContent = updateCount;
-          
-          updatePosterDisplay();
-        }, (err) => {
-          document.getElementById('gps-status').innerHTML = `<span style="color:#f00;">エラー</span>`;
-          console.error('GPS error:', err);
-        }, { 
-          enableHighAccuracy: true, 
-          maximumAge: 0,
-          timeout: 5000
-        });
-      } else {
-        alert('このデバイスはGPSに対応していません');
+          console.log('GPS:', userLat.toFixed(6), userLon.toFixed(6));
+        }, null, { enableHighAccuracy: true, maximumAge: 0 });
       }
-    }
 
-    function updatePosterDisplay() {
-      if (!userLat || !userLon) return;
-
-      let nearest = null;
-      let minDistance = Infinity;
-
-      // 最寄りのポスターを探す
-      posters.forEach(poster => {
-        const distanceDeg = calculateDistanceDegree(userLat, userLon, poster.lat, poster.lon);
-        if (distanceDeg < minDistance) {
-          minDistance = distanceDeg;
-          nearest = poster;
-        }
-      });
-
-      if (nearest) {
-        const distanceM = degreeToMeter(minDistance);
-        
-        // 最寄り情報を更新
-        document.getElementById('nearest-id').textContent = `ポスター${nearest.id}`;
-        document.getElementById('nearest-distance').textContent = distanceM.toFixed(1);
-
-        // 表示距離内かチェック
-        if (minDistance < DISPLAY_THRESHOLD) {
-          // ポスターを表示
-          showPoster(nearest);
-          document.getElementById('visibility-status').innerHTML = 
-            '<span style="color:#0f0;">✓ 表示中</span>';
+      // ジャイロスコープ（方位）
+      if (window.DeviceOrientationEvent) {
+        if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+          DeviceOrientationEvent.requestPermission().then(permission => {
+            if (permission === 'granted') startOrientation();
+          }).catch(() => startOrientation());
         } else {
-          // ポスターを非表示
-          hidePoster();
-          document.getElementById('visibility-status').innerHTML = 
-            `<span style="color:#ff0;"></span>`;
+          startOrientation();
         }
       }
-    }
 
-    function showPoster(poster) {
-      const container = document.getElementById('poster-container');
-      const info = document.getElementById('poster-info');
-      
-      if (currentPoster !== poster.id) {
-        currentPoster = poster.id;
-        info.textContent = `ポスター ${poster.id}`;
-        console.log(`ポスター${poster.id}を表示`);
+      function startOrientation() {
+        window.addEventListener('deviceorientationabsolute', (event) => {
+          if (event.absolute && event.alpha !== null) {
+            heading = 360 - event.alpha;
+          }
+        });
+        window.addEventListener('deviceorientation', (event) => {
+          if (event.alpha !== null) {
+            heading = 360 - event.alpha;
+          }
+        });
       }
-      
-      container.style.display = 'block';
+
+      // 描画ループ
+      function draw() {
+        if (!userLat || !userLon || !posterImage) {
+          requestAnimationFrame(draw);
+          return;
+        }
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        const viewAngle = 90; // 視野角90度
+
+        // 全てのポスターを描画
+        posters.forEach(poster => {
+          const distanceDeg = calculateDistanceDegree(userLat, userLon, poster.lat, poster.lon);
+          const bearing = calculateBearing(userLat, userLon, poster.lat, poster.lon);
+          
+          // スマホの向きとポスターの方角の差
+          let angleDiff = bearing - heading;
+          if (angleDiff > 180) angleDiff -= 360;
+          if (angleDiff < -180) angleDiff += 360;
+
+          // 視野角内にあるかチェック
+          if (Math.abs(angleDiff) < viewAngle) {
+            // 画面上のX位置
+            const screenX = centerX + (angleDiff / viewAngle) * canvas.width;
+            
+            // 距離に応じたスケール
+            const scale = Math.max(0.3, Math.min(2.5, 0.003 / distanceDeg));
+            
+            // ポスターサイズ（縦長 2:3）
+            const width = 200 * scale;
+            const height = 300 * scale;
+            
+            // Y位置（高さを反映）
+            // 高さが高いほど画面の上に表示
+            const heightOffset = (poster.height - 2.8) * 100; // 基準高さ2.8m
+            const screenY = centerY - height / 2 - heightOffset;
+
+            // ポスター画像を描画
+            ctx.drawImage(posterImage, 
+              screenX - width / 2, 
+              screenY, 
+              width, 
+              height
+            );
+          }
+        });
+
+        requestAnimationFrame(draw);
+      }
+
+      draw();
     }
 
-    function hidePoster() {
-      const container = document.getElementById('poster-container');
-      container.style.display = 'none';
-      currentPoster = null;
-    }
+    // リサイズ対応
+    window.addEventListener('resize', () => {
+      if (canvas) {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      }
+    });
   </script>
 </body>
 </html>
