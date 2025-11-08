@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>AR ポスター配置シミュレーション - デバッグ版</title>
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ar.js@2.2.2/aframe/build/aframe-ar-nft.min.js"></script>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    #info {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      background: rgba(0,0,0,0.9);
+      color: white;
+      padding: 15px;
+      border-radius: 5px;
+      z-index: 1000;
+      font-family: monospace;
+      font-size: 11px;
+      max-width: 350px;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    #debug {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid rgba(255,255,255,0.3);
+      font-size: 10px;
+      color: #0f0;
+    }
+    .status-ok { color: #0f0; }
+    .status-error { color: #f00; }
+    .status-warning { color: #ff0; }
+  </style>
+</head>
+<body>
+  
+  <div id="info">
+    <div><strong>🔍 ARデバッグ情報</strong></div>
+    <div id="status">初期化中...</div>
+    <div id="camera-status">📷 カメラ: 待機中</div>
+    <div id="gps-status">📍 GPS: 待機中</div>
+    <div id="permissions">🔐 許可: 確認中</div>
+    <hr style="border-color: rgba(255,255,255,0.3);">
+    <div>現在位置: <span id="current-lat">--</span>, <span id="current-lon">--</span></div>
+    <div>精度: <span id="accuracy">--</span>m</div>
+    <div>最寄り: <span id="nearest-poster">--</span></div>
+    <div>距離: <span id="distance">--</span>m</div>
+    <div>表示中: <span id="visible-count">0</span> / 11</div>
+    <div id="debug"></div>
+  </div>
+
+  <a-scene
+    vr-mode-ui="enabled: false"
+    arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: false;"
+    renderer="logarithmicDepthBuffer: true; precision: medium;"
+    embedded>
+    
+    <a-assets>
+      <img id="poster" src="poster.jpg" crossorigin="anonymous">
+    </a-assets>
+    
+    <a-camera gps-projected-camera="simulateLatitude: 35.720343; simulateLongitude: 139.765052;" rotation-reader></a-camera>
+
+    <!-- ポスター1 -->
+    <a-entity gps-projected-entity-place="latitude: 35.720533; longitude: 139.762619;">
+      <a-plane material="src: #poster; transparent: true; opacity: 1;" width="2" height="3" position="0 2.31 0"></a-plane>
+      <a-text value="1" position="0 0.51 0.01" align="center" color="#FFFF00" width="3"></a-text>
+    </a-entity>
+
+    <!-- ポスター2 -->
+    <a-entity gps-projected-entity-place="latitude: 35.720446; longitude: 139.763486;">
+      <a-plane material="src: #poster; transparent: true; opacity: 1;" width="2" height="3" position="0 2.72 0"></a-plane>
+      <a-text value="2" position="0 0.92 0.01" align="center" color="#FFFF00" width="3"></a-text>
+    </a-entity>
+
+    <!-- ポスター3 -->
+    <a-entity gps-projected-entity-place="latitude: 35.720987; longitude: 139.764194;">
+      <a-plane material="src: #poster; transparent: true; opacity: 1;" width="2" height="3" position="0 2.82 0"></a-plane>
+      <a-text value="3" position="0 1.02 0.01" align="center" color="#FFFF00" width="3"></a-text>
+    </a-entity>
+
+    <!-- ポスター4 -->
+    <a-entity gps-projected-entity-place="latitude: 35.720798; longitude: 139.764362;">
+      <a-plane material="src: #poster; transparent: true; opacity: 1;" width="2" height="3" position="0 3.08 0"></a-plane>
+      <a-text value="4" position="0 1.28 0.01" align="center" color="#FFFF00" width="3"></a-text>
+    </a-entity>
+
+    <!-- ポスター5 -->
+    <a-entity gps-projected-entity-place="latitude: 35.720655; longitude: 139.764665;">
+      <a-plane material="src: #poster; transparent: true; opacity: 1;" width="2" height="3" position="0 2.97 0"></a-plane>
+      <a-text value="5" position="0 1.17 0.01" align="center" color="#FFFF00" width="3"></a-text>
+    </a-entity>
+
+    <!-- ポスター6 -->
+    <a-entity gps-projected-entity-place="latitude: 35.720462; longitude: 139.765279;">
+      <a-plane material="src: #poster; transparent: true; opacity: 1;" width="2" height="3" position="0 2.6 0"></a-plane>
+      <a-text value="6" position="0 0.80 0.01" align="center" color="#FFFF00" width="3"></a-text>
+    </a-entity>
+
+    <!-- ポスター7 -->
+    <a-entity gps-projected-entity-place="latitude: 35.720311; longitude: 139.765584;">
+      <a-plane material="src: #poster; transparent: true; opacity: 1;" width="2" height="3" position="0 2.62 0"></a-plane>
+      <a-text value="7" position="0 0.82 0.01" align="center" color="#FFFF00" width="3"></a-text>
+    </a-entity>
+
+    <!-- ポスター8 -->
+    <a-entity gps-projected-entity-place="latitude: 35.720145; longitude: 139.765950;">
+      <a-plane material="src: #poster; transparent: true; opacity: 1;" width="2" height="3" position="0 2.7 0"></a-plane>
+      <a-text value="8" position="0 0.90 0.01" align="center" color="#FFFF00" width="3"></a-text>
+    </a-entity>
+
+    <!-- ポスター9 -->
+    <a-entity gps-projected-entity-place="latitude: 35.719991; longitude: 139.766207;">
+      <a-plane material="src: #poster; transparent: true; opacity: 1;" width="2" height="3" position="0 2.73 0"></a-plane>
+      <a-text value="9" position="0 0.93 0.01" align="center" color="#FFFF00" width="3"></a-text>
+    </a-entity>
+
+    <!-- ポスター10 -->
+    <a-entity gps-projected-entity-place="latitude: 35.719865; longitude: 139.766525;">
+      <a-plane material="src: #poster; transparent: true; opacity: 1;" width="2" height="3" position="0 2.89 0"></a-plane>
+      <a-text value="10" position="0 1.09 0.01" align="center" color="#FFFF00" width="3"></a-text>
+    </a-entity>
+
+    <!-- ポスター11 -->
+    <a-entity gps-projected-entity-place="latitude: 35.719580; longitude: 139.766698;">
+      <a-plane material="src: #poster; transparent: true; opacity: 1;" width="2" height="3" position="0 3.24 0"></a-plane>
+      <a-text value="11" position="0 1.44 0.01" align="center" color="#FFFF00" width="3"></a-text>
+    </a-entity>
+
+  </a-scene>
+
+  <script>
+    const posters = [
+      {id: 1, lat: 35.720533, lon: 139.762619, ele: 2.31},
+      {id: 2, lat: 35.720446, lon: 139.763486, ele: 2.72},
+      {id: 3, lat: 35.720987, lon: 139.764194, ele: 2.82},
+      {id: 4, lat: 35.720798, lon: 139.764362, ele: 3.08},
+      {id: 5, lat: 35.720655, lon: 139.764665, ele: 2.97},
+      {id: 6, lat: 35.720462, lon: 139.765279, ele: 2.6},
+      {id: 7, lat: 35.720311, lon: 139.765584, ele: 2.62},
+      {id: 8, lat: 35.720145, lon: 139.765950, ele: 2.7},
+      {id: 9, lat: 35.719991, lon: 139.766207, ele: 2.73},
+      {id: 10, lat: 35.719865, lon: 139.766525, ele: 2.89},
+      {id: 11, lat: 35.719580, lon: 139.766698, ele: 3.24}
+    ];
+
+    let debugLog = [];
+    
+    function addDebug(msg) {
+      debugLog.push(`${new Date().toLocaleTimeString()}: ${msg}`);
+      if (debugLog.length > 10) debugLog.shift();
+      document.getElementById('debug').innerHTML = debugLog.join('<br>');
+    }
+
+    function calculateDistance(lat1, lon1, lat2, lon2) {
+      const R = 6371e3;
+      const φ1 = lat1 * Math.PI / 180;
+      const φ2 = lat2 * Math.PI / 180;
+      const Δφ = (lat2 - lat1) * Math.PI / 180;
+      const Δλ = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                Math.cos(φ1) * Math.cos(φ2) *
+                Math.sin(Δλ/2) * Math.sin(Δλ/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return R * c;
+    }
+
+    // 許可チェック
+    addDebug('アプリ起動');
+    
+    // HTTPSチェック
+    if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+      document.getElementById('permissions').innerHTML = '🔐 <span class="status-error">HTTPSが必要です</span>';
+      addDebug('エラー: HTTPSではありません');
+    } else {
+      document.getElementById('permissions').innerHTML = '🔐 <span class="status-ok">HTTPS OK</span>';
+      addDebug('HTTPS確認OK');
+    }
+
+    // カメラ許可チェック
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then(stream => {
+        document.getElementById('camera-status').innerHTML = '📷 <span class="status-ok">カメラ: 許可済み</span>';
+        addDebug('カメラアクセス許可');
+        stream.getTracks().forEach(track => track.stop());
+      })
+      .catch(err => {
+        document.getElementById('camera-status').innerHTML = `📷 <span class="status-error">カメラ: ${err.message}</span>`;
+        addDebug(`カメラエラー: ${err.message}`);
+      });
+
+    // GPS位置情報の監視
+    if (navigator.geolocation) {
+      document.getElementById('gps-status').innerHTML = '📍 <span class="status-warning">GPS: 取得中...</span>';
+      addDebug('GPS取得開始');
+      
+      let gpsCount = 0;
+      navigator.geolocation.watchPosition((position) => {
+        gpsCount++;
+        const userLat = position.coords.latitude;
+        const userLon = position.coords.longitude;
+        const accuracy = position.coords.accuracy;
+        
+        document.getElementById('gps-status').innerHTML = '📍 <span class="status-ok">GPS: 取得成功</span>';
+        document.getElementById('current-lat').textContent = userLat.toFixed(6);
+        document.getElementById('current-lon').textContent = userLon.toFixed(6);
+        document.getElementById('accuracy').textContent = accuracy.toFixed(1);
+        document.getElementById('status').innerHTML = `<span class="status-ok">✅ 動作中 (更新${gpsCount}回)</span>`;
+        
+        if (gpsCount === 1) {
+          addDebug(`GPS初回取得: ${userLat.toFixed(4)}, ${userLon.toFixed(4)}`);
+        }
+
+        let nearest = null;
+        let minDistance = Infinity;
+        let visibleCount = 0;
+
+        posters.forEach(poster => {
+          const distance = calculateDistance(userLat, userLon, poster.lat, poster.lon);
+          if (distance < minDistance) {
+            minDistance = distance;
+            nearest = poster;
+          }
+          if (distance < 300) {
+            visibleCount++;
+          }
+        });
+
+        if (nearest) {
+          document.getElementById('nearest-poster').textContent = `${nearest.id}番`;
+          document.getElementById('distance').textContent = minDistance.toFixed(1);
+        }
+        
+        document.getElementById('visible-count').textContent = visibleCount;
+        
+        if (gpsCount === 1 && visibleCount === 0) {
+          addDebug(`警告: 300m以内にポスターなし`);
+        }
+      }, (error) => {
+        let errorMsg = '';
+        switch(error.code) {
+          case error.PERMISSION_DENIED:
+            errorMsg = '位置情報の許可が必要です';
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMsg = '位置情報が利用できません';
+            break;
+          case error.TIMEOUT:
+            errorMsg = 'タイムアウト';
+            break;
+          default:
+            errorMsg = error.message;
+        }
+        document.getElementById('gps-status').innerHTML = `📍 <span class="status-error">GPS: ${errorMsg}</span>`;
+        addDebug(`GPSエラー: ${errorMsg}`);
+      }, {
+        enableHighAccuracy: true,
+        maximumAge: 0,
+        timeout: 27000
+      });
+    } else {
+      document.getElementById('gps-status').innerHTML = '📍 <span class="status-error">GPS: 非対応</span>';
+      addDebug('エラー: Geolocation API非対応');
+    }
+
+    // A-Frameシーンの読み込み確認
+    const scene = document.querySelector('a-scene');
+    if (scene) {
+      scene.addEventListener('loaded', () => {
+        addDebug('A-Frameシーン読み込み完了');
+      });
+      scene.addEventListener('renderstart', () => {
+        addDebug('レンダリング開始');
+      });
+    }
+
+    addDebug('初期化完了');
+  </script>
+</body>
+</html>
