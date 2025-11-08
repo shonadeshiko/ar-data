@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>AR ポスター - 改良版</title>
+  <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    #info {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      background: rgba(0,0,0,0.8);
+      color: white;
+      padding: 10px;
+      border-radius: 5px;
+      z-index: 1000;
+      font-family: monospace;
+      font-size: 11px;
+      max-width: 300px;
+    }
+  </style>
+</head>
+<body>
+  
+  <div id="info">
+    <div>GPS: <span id="gps-info">待機中...</span></div>
+    <div>最寄り: <span id="nearest">--</span></div>
+    <div>距離: <span id="dist">--</span>m</div>
+    <div>表示: <span id="visible">0</span>/11</div>
+  </div>
+
+  <a-scene
+    vr-mode-ui="enabled: false"
+    arjs="sourceType: webcam; videoTexture: true; debugUIEnabled: true;"
+    renderer="antialias: true; alpha: true">
+    
+    <a-assets>
+      <img id="poster" src="poster.jpg" crossorigin="anonymous">
+    </a-assets>
+    
+    <a-camera gps-camera rotation-reader></a-camera>
+
+    <!-- ポスター1 - 距離21.1m -->
+    <a-box
+      gps-entity-place="latitude: 35.720533; longitude: 139.762619;"
+      material="color: red"
+      scale="2 3 0.1"
+      position="0 2.31 0">
+      <a-text value="1" align="center" position="0 0 0.1" scale="5 5 5"></a-text>
+    </a-box>
+
+    <!-- ポスター2 -->
+    <a-box
+      gps-entity-place="latitude: 35.720446; longitude: 139.763486;"
+      material="color: orange"
+      scale="2 3 0.1"
+      position="0 2.72 0">
+      <a-text value="2" align="center" position="0 0 0.1" scale="5 5 5"></a-text>
+    </a-box>
+
+    <!-- ポスター3 -->
+    <a-box
+      gps-entity-place="latitude: 35.720987; longitude: 139.764194;"
+      material="color: yellow"
+      scale="2 3 0.1"
+      position="0 2.82 0">
+      <a-text value="3" align="center" position="0 0 0.1" scale="5 5 5"></a-text>
+    </a-box>
+
+    <!-- ポスター4 -->
+    <a-box
+      gps-entity-place="latitude: 35.720798; longitude: 139.764362;"
+      material="color: green"
+      scale="2 3 0.1"
+      position="0 3.08 0">
+      <a-text value="4" align="center" position="0 0 0.1" scale="5 5 5"></a-text>
+    </a-box>
+
+    <!-- ポスター5 -->
+    <a-box
+      gps-entity-place="latitude: 35.720655; longitude: 139.764665;"
+      material="color: cyan"
+      scale="2 3 0.1"
+      position="0 2.97 0">
+      <a-text value="5" align="center" position="0 0 0.1" scale="5 5 5"></a-text>
+    </a-box>
+
+    <!-- ポスター6 - 最寄り！ -->
+    <a-box
+      gps-entity-place="latitude: 35.720462; longitude: 139.765279;"
+      material="color: blue"
+      scale="2 3 0.1"
+      position="0 2.6 0">
+      <a-text value="6" align="center" position="0 0 0.1" scale="5 5 5"></a-text>
+    </a-box>
+
+    <!-- ポスター7 -->
+    <a-box
+      gps-entity-place="latitude: 35.720311; longitude: 139.765584;"
+      material="color: purple"
+      scale="2 3 0.1"
+      position="0 2.62 0">
+      <a-text value="7" align="center" position="0 0 0.1" scale="5 5 5"></a-text>
+    </a-box>
+
+    <!-- ポスター8 -->
+    <a-box
+      gps-entity-place="latitude: 35.720145; longitude: 139.765950;"
+      material="color: pink"
+      scale="2 3 0.1"
+      position="0 2.7 0">
+      <a-text value="8" align="center" position="0 0 0.1" scale="5 5 5"></a-text>
+    </a-box>
+
+    <!-- ポスター9 -->
+    <a-box
+      gps-entity-place="latitude: 35.719991; longitude: 139.766207;"
+      material="color: brown"
+      scale="2 3 0.1"
+      position="0 2.73 0">
+      <a-text value="9" align="center" position="0 0 0.1" scale="5 5 5"></a-text>
+    </a-box>
+
+    <!-- ポスター10 -->
+    <a-box
+      gps-entity-place="latitude: 35.719865; longitude: 139.766525;"
+      material="color: white"
+      scale="2 3 0.1"
+      position="0 2.89 0">
+      <a-text value="10" align="center" position="0 0 0.1" scale="5 5 5" color="black"></a-text>
+    </a-box>
+
+    <!-- ポスター11 -->
+    <a-box
+      gps-entity-place="latitude: 35.719580; longitude: 139.766698;"
+      material="color: lime"
+      scale="2 3 0.1"
+      position="0 3.24 0">
+      <a-text value="11" align="center" position="0 0 0.1" scale="5 5 5"></a-text>
+    </a-box>
+
+  </a-scene>
+
+  <script>
+    const posters = [
+      {id: 1, lat: 35.720533, lon: 139.762619},
+      {id: 2, lat: 35.720446, lon: 139.763486},
+      {id: 3, lat: 35.720987, lon: 139.764194},
+      {id: 4, lat: 35.720798, lon: 139.764362},
+      {id: 5, lat: 35.720655, lon: 139.764665},
+      {id: 6, lat: 35.720462, lon: 139.765279},
+      {id: 7, lat: 35.720311, lon: 139.765584},
+      {id: 8, lat: 35.720145, lon: 139.765950},
+      {id: 9, lat: 35.719991, lon: 139.766207},
+      {id: 10, lat: 35.719865, lon: 139.766525},
+      {id: 11, lat: 35.719580, lon: 139.766698}
+    ];
+
+    function calculateDistance(lat1, lon1, lat2, lon2) {
+      const R = 6371e3;
+      const φ1 = lat1 * Math.PI / 180;
+      const φ2 = lat2 * Math.PI / 180;
+      const Δφ = (lat2 - lat1) * Math.PI / 180;
+      const Δλ = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                Math.cos(φ1) * Math.cos(φ2) *
+                Math.sin(Δλ/2) * Math.sin(Δλ/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return R * c;
+    }
+
+    if (navigator.geolocation) {
+      navigator.geolocation.watchPosition((position) => {
+        const userLat = position.coords.latitude;
+        const userLon = position.coords.longitude;
+        
+        document.getElementById('gps-info').textContent = 
+          `${userLat.toFixed(5)}, ${userLon.toFixed(5)}`;
+
+        let nearest = null;
+        let minDistance = Infinity;
+        let visibleCount = 0;
+
+        posters.forEach(poster => {
+          const distance = calculateDistance(userLat, userLon, poster.lat, poster.lon);
+          if (distance < minDistance) {
+            minDistance = distance;
+            nearest = poster;
+          }
+          if (distance < 1000) visibleCount++;
+        });
+
+        if (nearest) {
+          document.getElementById('nearest').textContent = `${nearest.id}番`;
+          document.getElementById('dist').textContent = minDistance.toFixed(1);
+        }
+        document.getElementById('visible').textContent = visibleCount;
+      }, null, {
+        enableHighAccuracy: true,
+        maximumAge: 0
+      });
+    }
+  </script>
+</body>
+</html>
