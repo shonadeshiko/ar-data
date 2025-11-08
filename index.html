@@ -45,7 +45,7 @@
       font-family: monospace;
       max-width: 90%;
     }
-    #permission-panel {
+    #button-panel {
       position: fixed;
       top: 50%;
       left: 50%;
@@ -56,7 +56,7 @@
       border-radius: 15px;
       z-index: 2000;
       text-align: center;
-      display: none;
+      max-width: 80%;
     }
     .button {
       padding: 15px 30px;
@@ -67,21 +67,50 @@
       border-radius: 10px;
       cursor: pointer;
       margin: 10px;
+      display: block;
+      width: 100%;
     }
     .button:active {
       background: #0051D5;
     }
+    .button:disabled {
+      background: #666;
+      cursor: not-allowed;
+    }
+    .success {
+      color: #0f0;
+      margin: 10px 0;
+    }
+    .error {
+      color: #f00;
+      margin: 10px 0;
+    }
     .ok { color: #0f0; }
     .warn { color: #ff0; }
-    .error { color: #f00; }
+    .err { color: #f00; }
   </style>
 </head>
 <body>
   
-  <div id="permission-panel">
-    <h2>📱 センサーの許可</h2>
-    <p>ARを使うには、カメラ、GPS、<br>モーションセンサーの許可が必要です</p>
-    <button class="button" onclick="startAR()">ARを開始</button>
+  <div id="button-panel">
+    <h2>📱 ARの準備</h2>
+    <p id="status-message">ARを始めるには3つの許可が必要です</p>
+    
+    <button id="start-button" class="button" onclick="startCamera()">
+      1️⃣ カメラを起動
+    </button>
+    
+    <button id="gps-button" class="button" onclick="startGPS()" disabled>
+      2️⃣ 位置情報を取得
+    </button>
+    
+    <button id="gyro-button" class="button" onclick="requestGyro()" disabled>
+      3️⃣ ジャイロセンサーを有効化
+    </button>
+    
+    <button id="close-button" class="button" onclick="closePanel()" disabled style="background:#28a745;">
+      ✅ ARを開始
+    </button>
   </div>
   
   <div id="video-container">
@@ -138,7 +167,7 @@
       document.getElementById('image-status').innerHTML = '<span class="ok">OK</span>';
     };
     img.onerror = () => {
-      document.getElementById('image-status').innerHTML = '<span class="error">エラー</span>';
+      document.getElementById('image-status').innerHTML = '<span class="err">エラー</span>';
     };
     img.src = 'poster.jpg';
     
@@ -161,34 +190,36 @@
       return (θ * 180 / Math.PI + 360) % 360;
     }
 
-    // ページ読み込み時に許可パネルを表示
-    window.addEventListener('load', () => {
-      document.getElementById('permission-panel').style.display = 'block';
-    });
-
-    async function startAR() {
-      document.getElementById('permission-panel').style.display = 'none';
-      
-      // カメラ起動
+    // ステップ1: カメラ起動
+    async function startCamera() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: 'environment', width: 1280, height: 720 }
         });
         const video = document.getElementById('camera-feed');
         video.srcObject = stream;
+        
+        document.getElementById('start-button').innerHTML = '✅ カメラ起動完了';
+        document.getElementById('start-button').disabled = true;
+        document.getElementById('gps-button').disabled = false;
+        
+        showMessage('カメラが起動しました', 'success');
         console.log('✓ カメラ起動');
+        
+        // Canvas初期化
+        canvas = document.getElementById('ar-canvas');
+        ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        
       } catch (err) {
-        alert('カメラエラー: ' + err.message);
-        return;
+        showMessage('カメラエラー: ' + err.message, 'error');
+        console.error('Camera error:', err);
       }
+    }
 
-      // Canvas初期化
-      canvas = document.getElementById('ar-canvas');
-      ctx = canvas.getContext('2d');
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-
-      // GPS開始
+    // ステップ2: GPS起動
+    function startGPS() {
       if (navigator.geolocation) {
         navigator.geolocation.watchPosition((position) => {
           userLat = position.coords.latitude;
@@ -197,64 +228,106 @@
           document.getElementById('position').textContent = 
             `${userLat.toFixed(6)}, ${userLon.toFixed(6)}`;
           updateDebugInfo();
+          
+          if (!document.getElementById('gps-button').disabled) {
+            document.getElementById('gps-button').innerHTML = '✅ 位置情報取得完了';
+            document.getElementById('gps-button').disabled = true;
+            document.getElementById('gyro-button').disabled = false;
+            showMessage('位置情報を取得しました', 'success');
+          }
         }, (err) => {
-          document.getElementById('gps-status').innerHTML = '<span class="error">エラー</span>';
+          document.getElementById('gps-status').innerHTML = '<span class="err">エラー</span>';
+          showMessage('GPS エラー: ' + err.message, 'error');
           console.error('GPS error:', err);
         }, { enableHighAccuracy: true, maximumAge: 0 });
       }
+    }
 
-      // モーションセンサー（ジャイロ）の許可を要求
-      if (typeof DeviceOrientationEvent !== 'undefined' && 
-          typeof DeviceOrientationEvent.requestPermission === 'function') {
-        // iOS 13+ の場合
-        try {
-          const permission = await DeviceOrientationEvent.requestPermission();
-          if (permission === 'granted') {
-            console.log('✓ モーションセンサー許可');
-            startOrientation();
-          } else {
-            console.log('✗ モーションセンサー拒否');
-            alert('方位情報を使うには、モーションセンサーの許可が必要です。\n\n設定 > Safari > モーションと画面の向きのアクセス をオンにしてください。');
+    // ステップ3: ジャイロセンサー許可を要求（iOS 13+対応）
+    async function requestGyro() {
+      if (typeof DeviceOrientationEvent !== 'undefined') {
+        
+        // iOS 13+ の場合、明示的に許可を要求
+        if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+          try {
+            showMessage('ジャイロセンサーの許可を求めています...', 'success');
+            
+            const permission = await DeviceOrientationEvent.requestPermission();
+            
+            if (permission === 'granted') {
+              showMessage('ジャイロセンサーが有効になりました！', 'success');
+              document.getElementById('gyro-button').innerHTML = '✅ ジャイロセンサー有効化完了';
+              document.getElementById('gyro-button').disabled = true;
+              document.getElementById('close-button').disabled = false;
+              
+              startOrientation();
+              console.log('✓ ジャイロセンサー許可');
+            } else {
+              showMessage('⚠️ ジャイロセンサーが拒否されました。\n\niPhone設定:\n設定 > Safari > モーションと画面の向きのアクセス\nをオンにして、ページを再読み込みしてください。', 'error');
+              console.log('✗ ジャイロセンサー拒否');
+            }
+          } catch (err) {
+            showMessage('ジャイロセンサーエラー: ' + err.message + '\n\niPhone設定:\n設定 > Safari > モーションと画面の向きのアクセス\nを確認してください。', 'error');
+            console.error('Permission error:', err);
           }
-        } catch (err) {
-          console.error('Permission error:', err);
-          alert('モーションセンサーの許可に失敗しました。\n\n設定 > Safari > モーションと画面の向きのアクセス を確認してください。');
+        } else {
+          // Android などの場合（許可不要）
+          showMessage('ジャイロセンサーを起動しています...', 'success');
+          startOrientation();
+          document.getElementById('gyro-button').innerHTML = '✅ ジャイロセンサー有効化完了';
+          document.getElementById('gyro-button').disabled = true;
+          document.getElementById('close-button').disabled = false;
         }
       } else {
-        // Android などの場合
-        startOrientation();
+        showMessage('このデバイスはジャイロセンサーに対応していません', 'error');
       }
+    }
 
-      function startOrientation() {
-        // デバイスの絶対方位を取得
-        window.addEventListener('deviceorientationabsolute', (event) => {
-          if (event.absolute && event.alpha !== null) {
-            heading = 360 - event.alpha;
-            headingAvailable = true;
-            document.getElementById('heading').innerHTML = 
-              `<span class="ok">${Math.round(heading)}</span>`;
-          }
-        });
-        
-        // フォールバック
-        window.addEventListener('deviceorientation', (event) => {
-          if (event.alpha !== null && !headingAvailable) {
-            heading = 360 - event.alpha;
-            document.getElementById('heading').innerHTML = 
-              `<span class="warn">${Math.round(heading)}</span>`;
-          }
-        });
-        
-        // 5秒経っても方位が取得できない場合の警告
-        setTimeout(() => {
-          if (!headingAvailable && heading === 0) {
-            document.getElementById('heading').innerHTML = '<span class="error">取得失敗</span>';
-            alert('⚠️ 方位情報が取得できません。\n\niPhone設定:\n設定 > Safari > モーションと画面の向きのアクセス\nをオンにしてください。');
-          }
-        }, 5000);
-      }
+    // ジャイロセンサーのイベントリスナーを設定
+    function startOrientation() {
+      // デバイスの絶対方位を取得
+      window.addEventListener('deviceorientationabsolute', (event) => {
+        if (event.absolute && event.alpha !== null) {
+          heading = 360 - event.alpha;
+          headingAvailable = true;
+          document.getElementById('heading').innerHTML = 
+            `<span class="ok">${Math.round(heading)}</span>`;
+        }
+      });
+      
+      // フォールバック（相対方位）
+      window.addEventListener('deviceorientation', (event) => {
+        if (event.alpha !== null && !headingAvailable) {
+          heading = 360 - event.alpha;
+          document.getElementById('heading').innerHTML = 
+            `<span class="warn">${Math.round(heading)}</span>`;
+        }
+      });
+      
+      // 3秒経っても方位が取得できない場合の警告
+      setTimeout(() => {
+        if (!headingAvailable && heading === 0) {
+          document.getElementById('heading').innerHTML = '<span class="err">取得失敗</span>';
+          showMessage('⚠️ 方位情報が取得できません。スマホを動かしてみてください。', 'error');
+        }
+      }, 3000);
+    }
 
-      // 描画ループ
+    // パネルを閉じてARを開始
+    function closePanel() {
+      document.getElementById('button-panel').style.display = 'none';
+      startAR();
+    }
+
+    // メッセージ表示
+    function showMessage(message, type) {
+      const statusElem = document.getElementById('status-message');
+      statusElem.textContent = message;
+      statusElem.className = type;
+    }
+
+    // AR描画ループ
+    function startAR() {
       function draw() {
         if (!userLat || !userLon || !posterImage) {
           requestAnimationFrame(draw);
