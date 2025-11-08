@@ -8,6 +8,7 @@
     body { 
       margin: 0; 
       overflow: hidden;
+      font-family: sans-serif;
     }
     #video-container {
       position: fixed;
@@ -31,42 +32,84 @@
       z-index: 2;
       pointer-events: none;
     }
-    #start-button {
+    #debug-info {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      background: rgba(0,0,0,0.85);
+      color: white;
+      padding: 10px;
+      border-radius: 5px;
+      z-index: 1000;
+      font-size: 11px;
+      font-family: monospace;
+      max-width: 90%;
+    }
+    #permission-panel {
       position: fixed;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      padding: 20px 40px;
-      font-size: 18px;
+      background: rgba(0,0,0,0.95);
+      color: white;
+      padding: 30px;
+      border-radius: 15px;
+      z-index: 2000;
+      text-align: center;
+      display: none;
+    }
+    .button {
+      padding: 15px 30px;
+      font-size: 16px;
       background: #007AFF;
       color: white;
       border: none;
       border-radius: 10px;
       cursor: pointer;
-      z-index: 2000;
-      font-family: sans-serif;
+      margin: 10px;
     }
+    .button:active {
+      background: #0051D5;
+    }
+    .ok { color: #0f0; }
+    .warn { color: #ff0; }
+    .error { color: #f00; }
   </style>
 </head>
 <body>
   
-  <button id="start-button">ARを開始</button>
+  <div id="permission-panel">
+    <h2>📱 センサーの許可</h2>
+    <p>ARを使うには、カメラ、GPS、<br>モーションセンサーの許可が必要です</p>
+    <button class="button" onclick="startAR()">ARを開始</button>
+  </div>
   
   <div id="video-container">
     <video id="camera-feed" autoplay playsinline></video>
   </div>
   
   <canvas id="ar-canvas"></canvas>
+  
+  <div id="debug-info">
+    <div><strong>📱 デバッグ情報</strong></div>
+    <div>GPS: <span id="gps-status">待機中</span></div>
+    <div>位置: <span id="position">--</span></div>
+    <div>方位: <span id="heading">--</span>°</div>
+    <div>画像: <span id="image-status">読込中</span></div>
+    <div>表示範囲: 50m</div>
+    <div>表示中: <span id="visible-count" class="warn">0</span>個</div>
+    <div>最寄り: <span id="nearest">--</span></div>
+  </div>
 
   <script>
-    // 11箇所のポスター座標（高さ情報付き）
+    // 11箇所のポスター座標
     const posters = [
       {id: 1, lat: 35.720533, lon: 139.762619, height: 2.31},
       {id: 2, lat: 35.720446, lon: 139.763486, height: 2.72},
       {id: 3, lat: 35.720987, lon: 139.764194, height: 2.82},
       {id: 4, lat: 35.720798, lon: 139.764362, height: 3.08},
       {id: 5, lat: 35.720655, lon: 139.764665, height: 2.97},
-      {id: 6, lat: 35.72034253101969, lon: 139.76505158909623,  height: 1.0},
+      {id: 6, lat: 35.720462, lon: 139.765279, height: 2.6},
       {id: 7, lat: 35.720311, lon: 139.765584, height: 2.62},
       {id: 8, lat: 35.720145, lon: 139.765950, height: 2.7},
       {id: 9, lat: 35.719991, lon: 139.766207, height: 2.73},
@@ -79,30 +122,38 @@
     let heading = 0;
     let canvas, ctx;
     let posterImage = null;
+    let headingAvailable = false;
     
-    // 表示距離の閾値（度）- 約80m以内
-    const DISPLAY_RANGE = 0.0008;
+    // 表示距離（約50m以内）
+    const DISPLAY_RANGE = 0.0005;
     
-    // カメラの視野角（実際のスマホカメラに近い値）
-    const CAMERA_FOV = 70; // 度
+    // カメラの視野角
+    const CAMERA_FOV = 70;
     
     // ポスター画像を読み込み
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
       posterImage = img;
-      console.log('✓ ポスター画像読み込み完了');
+      document.getElementById('image-status').innerHTML = '<span class="ok">OK</span>';
+    };
+    img.onerror = () => {
+      document.getElementById('image-status').innerHTML = '<span class="error">エラー</span>';
     };
     img.src = 'poster.jpg';
     
-    // 度数での距離計算
+    // 距離計算
     function calculateDistanceDegree(lat1, lon1, lat2, lon2) {
       const dLat = lat2 - lat1;
       const dLon = lon2 - lon1;
       return Math.sqrt(dLat * dLat + dLon * dLon);
     }
     
-    // 方位角計算（北を0度）
+    function degreeToMeter(degree) {
+      return degree * 100000;
+    }
+    
+    // 方位角計算
     function calculateBearing(lat1, lon1, lat2, lon2) {
       const dLon = lon2 - lon1;
       const dLat = lat2 - lat1;
@@ -110,12 +161,14 @@
       return (θ * 180 / Math.PI + 360) % 360;
     }
 
-    document.getElementById('start-button').addEventListener('click', async () => {
-      document.getElementById('start-button').style.display = 'none';
-      await startAR();
+    // ページ読み込み時に許可パネルを表示
+    window.addEventListener('load', () => {
+      document.getElementById('permission-panel').style.display = 'block';
     });
 
     async function startAR() {
+      document.getElementById('permission-panel').style.display = 'none';
+      
       // カメラ起動
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -140,31 +193,65 @@
         navigator.geolocation.watchPosition((position) => {
           userLat = position.coords.latitude;
           userLon = position.coords.longitude;
-        }, null, { enableHighAccuracy: true, maximumAge: 0 });
+          document.getElementById('gps-status').innerHTML = '<span class="ok">OK</span>';
+          document.getElementById('position').textContent = 
+            `${userLat.toFixed(6)}, ${userLon.toFixed(6)}`;
+          updateDebugInfo();
+        }, (err) => {
+          document.getElementById('gps-status').innerHTML = '<span class="error">エラー</span>';
+          console.error('GPS error:', err);
+        }, { enableHighAccuracy: true, maximumAge: 0 });
       }
 
-      // ジャイロスコープ（方位）
-      if (window.DeviceOrientationEvent) {
-        if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-          DeviceOrientationEvent.requestPermission().then(permission => {
-            if (permission === 'granted') startOrientation();
-          }).catch(() => startOrientation());
-        } else {
-          startOrientation();
+      // モーションセンサー（ジャイロ）の許可を要求
+      if (typeof DeviceOrientationEvent !== 'undefined' && 
+          typeof DeviceOrientationEvent.requestPermission === 'function') {
+        // iOS 13+ の場合
+        try {
+          const permission = await DeviceOrientationEvent.requestPermission();
+          if (permission === 'granted') {
+            console.log('✓ モーションセンサー許可');
+            startOrientation();
+          } else {
+            console.log('✗ モーションセンサー拒否');
+            alert('方位情報を使うには、モーションセンサーの許可が必要です。\n\n設定 > Safari > モーションと画面の向きのアクセス をオンにしてください。');
+          }
+        } catch (err) {
+          console.error('Permission error:', err);
+          alert('モーションセンサーの許可に失敗しました。\n\n設定 > Safari > モーションと画面の向きのアクセス を確認してください。');
         }
+      } else {
+        // Android などの場合
+        startOrientation();
       }
 
       function startOrientation() {
+        // デバイスの絶対方位を取得
         window.addEventListener('deviceorientationabsolute', (event) => {
           if (event.absolute && event.alpha !== null) {
             heading = 360 - event.alpha;
+            headingAvailable = true;
+            document.getElementById('heading').innerHTML = 
+              `<span class="ok">${Math.round(heading)}</span>`;
           }
         });
+        
+        // フォールバック
         window.addEventListener('deviceorientation', (event) => {
-          if (event.alpha !== null) {
+          if (event.alpha !== null && !headingAvailable) {
             heading = 360 - event.alpha;
+            document.getElementById('heading').innerHTML = 
+              `<span class="warn">${Math.round(heading)}</span>`;
           }
         });
+        
+        // 5秒経っても方位が取得できない場合の警告
+        setTimeout(() => {
+          if (!headingAvailable && heading === 0) {
+            document.getElementById('heading').innerHTML = '<span class="error">取得失敗</span>';
+            alert('⚠️ 方位情報が取得できません。\n\niPhone設定:\n設定 > Safari > モーションと画面の向きのアクセス\nをオンにしてください。');
+          }
+        }, 5000);
       }
 
       // 描画ループ
@@ -178,6 +265,7 @@
 
         const centerX = canvas.width / 2;
         const centerY = canvas.height / 2;
+        let visibleCount = 0;
 
         // 全てのポスターをチェック
         posters.forEach(poster => {
@@ -196,43 +284,31 @@
           // カメラの視野角内にあるかチェック
           const halfFOV = CAMERA_FOV / 2;
           if (Math.abs(angleDiff) < halfFOV) {
+            visibleCount++;
             
-            // 実際の位置に基づいて画面上の座標を計算
-            // angleDiffが0度 = 画面中央
-            // angleDiffが+35度 = 画面右端
-            // angleDiffが-35度 = 画面左端
+            // 画面上の座標を計算
             const screenX = centerX + (angleDiff / halfFOV) * (canvas.width / 2);
             
-            // 距離に応じた遠近感のあるスケール
-            // 近いほど大きく、遠いほど小さく
-            const minScale = 0.4;
-            const maxScale = 2.5;
-            const scale = Math.max(minScale, Math.min(maxScale, (DISPLAY_RANGE * 0.6) / distanceDeg));
+            // 距離に応じたスケール
+            const minScale = 0.5;
+            const maxScale = 3.0;
+            const scale = Math.max(minScale, Math.min(maxScale, (DISPLAY_RANGE * 0.8) / distanceDeg));
             
-            // ポスターの実際のサイズ（2:3比率）
+            // ポスターサイズ
             const posterWidth = 150 * scale;
             const posterHeight = 225 * scale;
             
-            // 高さの計算（地面からの高さを考慮）
-            // ユーザーの目の高さを1.6mと仮定
+            // 高さの計算
             const eyeHeight = 1.6;
-            const posterCenterHeight = poster.height + posterHeight / (2 * 100); // ポスター中心の高さ
-            
-            // 垂直方向の角度（仰角/俯角）
-            const distanceM = distanceDeg * 100000; // メートルに変換
+            const posterCenterHeight = poster.height;
+            const distanceM = degreeToMeter(distanceDeg);
             const heightDiff = posterCenterHeight - eyeHeight;
             const verticalAngle = Math.atan2(heightDiff, distanceM) * 180 / Math.PI;
-            
-            // 画面上のY位置（垂直角度を反映）
-            // 仰角がプラス = 画面上部
-            // 仰角がマイナス = 画面下部
             const screenY = centerY - (verticalAngle / 30) * canvas.height / 2;
             
             // ポスター画像を描画
             ctx.save();
-            
-            // 遠くのポスターは少し透明に（遠近感）
-            const opacity = Math.max(0.7, Math.min(1.0, scale / 1.5));
+            const opacity = Math.max(0.8, Math.min(1.0, scale / 2.0));
             ctx.globalAlpha = opacity;
             
             ctx.drawImage(posterImage, 
@@ -242,14 +318,51 @@
               posterHeight
             );
             
+            // デバッグ用の番号と距離
+            ctx.globalAlpha = 1.0;
+            ctx.fillStyle = '#FFFF00';
+            ctx.font = 'bold 20px sans-serif';
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 4;
+            const text = `${poster.id} (${Math.round(distanceM)}m)`;
+            ctx.strokeText(text, screenX, screenY - posterHeight/2 - 10);
+            ctx.fillText(text, screenX, screenY - posterHeight/2 - 10);
+            
             ctx.restore();
           }
         });
+
+        // 表示中のカウントを更新
+        const countElem = document.getElementById('visible-count');
+        countElem.textContent = visibleCount;
+        countElem.className = visibleCount > 0 ? 'ok' : 'warn';
 
         requestAnimationFrame(draw);
       }
 
       draw();
+    }
+
+    function updateDebugInfo() {
+      if (!userLat || !userLon) return;
+
+      let nearest = null;
+      let minDistance = Infinity;
+
+      posters.forEach(poster => {
+        const distanceDeg = calculateDistanceDegree(userLat, userLon, poster.lat, poster.lon);
+        if (distanceDeg < minDistance) {
+          minDistance = distanceDeg;
+          nearest = poster;
+        }
+      });
+
+      if (nearest) {
+        const distanceM = degreeToMeter(minDistance);
+        const inRange = minDistance < DISPLAY_RANGE;
+        document.getElementById('nearest').innerHTML = 
+          `ポスター${nearest.id} - ${distanceM.toFixed(0)}m <span class="${inRange ? 'ok' : 'warn'}">(${inRange ? '範囲内' : '範囲外'})</span>`;
+      }
     }
 
     // リサイズ対応
