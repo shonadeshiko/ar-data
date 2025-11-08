@@ -145,7 +145,7 @@
     let currentPoster = null;
     
     // 表示距離の閾値（度）
-    const DISPLAY_THRESHOLD = 0.0003; // 約30m以内
+    const DISPLAY_THRESHOLD = 0.00005; // 約30m以内
     
     // 度数での距離計算
     function calculateDistanceDegree(lat1, lon1, lat2, lon2) {
@@ -236,7 +236,7 @@
           // ポスターを非表示
           hidePoster();
           document.getElementById('visibility-status').innerHTML = 
-            `<span style="color:#ff0;">もう少し近づいてください (30m以内)</span>`;
+            `<span style="color:#ff0;"></span>`;
         }
       }
     }
