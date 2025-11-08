@@ -52,7 +52,6 @@
   初回は「位置情報」と「カメラ」を許可してください。
 </div>
 
-<!-- 調整用パネル（現場確認時のみ使用） -->
 <div id="panel">
   <div>現在位置: <span id="userPos">--</span></div>
   <div>ポスター位置: <span id="posterPos">--</span></div>
@@ -84,19 +83,18 @@
 <script>
   // ========= 基本設定 =========
   const posterConfig = {
-    lat: 35.72047743295264,    // ★あなたの指定した緯度
-    lon: 139.7651500172735,    // ★あなたの指定した経度
-    img: "image/poster1.png", // ★GitHub内に置くポスター画像
-    rotY: 180,                 // 初期向き（必要に応じて調整）
-    range: 30,                 // 30m以内で表示
-    height: 2,                 // 地面から2mの高さ
-    scale: "5 3 1"             // 大きさ
+    lat: 35.72047743295264,
+    lon: 139.7651500172735,
+    img: "image/poster1.png", // いまの構成に合わせてここ
+    rotY: 180,
+    range: 30,
+    height: 2,
+    scale: "5 3 1"
   };
   // ===========================
 
   const root = document.getElementById('posters-root');
 
-  // ポスターEntity生成
   const posterEl = document.createElement('a-image');
   posterEl.setAttribute('src', posterConfig.img);
   posterEl.setAttribute('gps-entity-place',
@@ -108,7 +106,6 @@
   posterEl.setAttribute('visible', 'false');
   root.appendChild(posterEl);
 
-  // 調整UI関連
   const userPosSpan = document.getElementById('userPos');
   const posterPosSpan = document.getElementById('posterPos');
   const distSpan = document.getElementById('dist');
@@ -141,10 +138,13 @@
   window.addEventListener('gps-camera-update-position', (e) => {
     const { latitude, longitude, accuracy } = e.detail.position;
     lastUserPos = { lat: latitude, lon: longitude, accuracy };
+
     userPosSpan.textContent =
       `${latitude.toFixed(6)}, ${longitude.toFixed(6)} (±${Math.round(accuracy)}m)`;
+
     const d = distanceMeters(latitude, longitude, posterConfig.lat, posterConfig.lon);
     distSpan.textContent = isFinite(d) ? Math.round(d) : '--';
+
     const shouldShow = d <= posterConfig.range;
     posterEl.setAttribute('visible', shouldShow ? 'true' : 'false');
   });
@@ -172,6 +172,7 @@
     posterConfig.lon = lastUserPos.lon;
     posterPosSpan.textContent =
       `${posterConfig.lat.toFixed(6)}, ${posterConfig.lon.toFixed(6)}`;
+
     posterEl.setAttribute('gps-entity-place',
       `latitude: ${posterConfig.lat}; longitude: ${posterConfig.lon};`
     );
