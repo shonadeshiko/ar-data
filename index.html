@@ -80,6 +80,12 @@
     let canvas, ctx;
     let posterImage = null;
     
+    // 表示距離の閾値（度）- 約80m以内
+    const DISPLAY_RANGE = 0.0008;
+    
+    // カメラの視野角（実際のスマホカメラに近い値）
+    const CAMERA_FOV = 70; // 度
+    
     // ポスター画像を読み込み
     const img = new Image();
     img.crossOrigin = 'anonymous';
@@ -134,7 +140,6 @@
         navigator.geolocation.watchPosition((position) => {
           userLat = position.coords.latitude;
           userLon = position.coords.longitude;
-          console.log('GPS:', userLat.toFixed(6), userLon.toFixed(6));
         }, null, { enableHighAccuracy: true, maximumAge: 0 });
       }
 
@@ -173,42 +178,71 @@
 
         const centerX = canvas.width / 2;
         const centerY = canvas.height / 2;
-        const viewAngle = 90; // 視野角90度
 
-        // 全てのポスターを描画
+        // 全てのポスターをチェック
         posters.forEach(poster => {
           const distanceDeg = calculateDistanceDegree(userLat, userLon, poster.lat, poster.lon);
+          
+          // 表示距離内かチェック
+          if (distanceDeg > DISPLAY_RANGE) return;
+          
           const bearing = calculateBearing(userLat, userLon, poster.lat, poster.lon);
           
-          // スマホの向きとポスターの方角の差
+          // スマホの向きとポスターの方角の差を計算
           let angleDiff = bearing - heading;
           if (angleDiff > 180) angleDiff -= 360;
           if (angleDiff < -180) angleDiff += 360;
 
-          // 視野角内にあるかチェック
-          if (Math.abs(angleDiff) < viewAngle) {
-            // 画面上のX位置
-            const screenX = centerX + (angleDiff / viewAngle) * canvas.width;
+          // カメラの視野角内にあるかチェック
+          const halfFOV = CAMERA_FOV / 2;
+          if (Math.abs(angleDiff) < halfFOV) {
             
-            // 距離に応じたスケール
-            const scale = Math.max(0.3, Math.min(2.5, 0.003 / distanceDeg));
+            // 実際の位置に基づいて画面上の座標を計算
+            // angleDiffが0度 = 画面中央
+            // angleDiffが+35度 = 画面右端
+            // angleDiffが-35度 = 画面左端
+            const screenX = centerX + (angleDiff / halfFOV) * (canvas.width / 2);
             
-            // ポスターサイズ（縦長 2:3）
-            const width = 200 * scale;
-            const height = 300 * scale;
+            // 距離に応じた遠近感のあるスケール
+            // 近いほど大きく、遠いほど小さく
+            const minScale = 0.4;
+            const maxScale = 2.5;
+            const scale = Math.max(minScale, Math.min(maxScale, (DISPLAY_RANGE * 0.6) / distanceDeg));
             
-            // Y位置（高さを反映）
-            // 高さが高いほど画面の上に表示
-            const heightOffset = (poster.height - 2.8) * 100; // 基準高さ2.8m
-            const screenY = centerY - height / 2 - heightOffset;
-
+            // ポスターの実際のサイズ（2:3比率）
+            const posterWidth = 150 * scale;
+            const posterHeight = 225 * scale;
+            
+            // 高さの計算（地面からの高さを考慮）
+            // ユーザーの目の高さを1.6mと仮定
+            const eyeHeight = 1.6;
+            const posterCenterHeight = poster.height + posterHeight / (2 * 100); // ポスター中心の高さ
+            
+            // 垂直方向の角度（仰角/俯角）
+            const distanceM = distanceDeg * 100000; // メートルに変換
+            const heightDiff = posterCenterHeight - eyeHeight;
+            const verticalAngle = Math.atan2(heightDiff, distanceM) * 180 / Math.PI;
+            
+            // 画面上のY位置（垂直角度を反映）
+            // 仰角がプラス = 画面上部
+            // 仰角がマイナス = 画面下部
+            const screenY = centerY - (verticalAngle / 30) * canvas.height / 2;
+            
             // ポスター画像を描画
+            ctx.save();
+            
+            // 遠くのポスターは少し透明に（遠近感）
+            const opacity = Math.max(0.7, Math.min(1.0, scale / 1.5));
+            ctx.globalAlpha = opacity;
+            
             ctx.drawImage(posterImage, 
-              screenX - width / 2, 
-              screenY, 
-              width, 
-              height
+              screenX - posterWidth / 2, 
+              screenY - posterHeight / 2, 
+              posterWidth, 
+              posterHeight
             );
+            
+            ctx.restore();
           }
         });
 
