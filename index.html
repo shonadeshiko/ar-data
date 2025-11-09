@@ -130,7 +130,7 @@
   </div>
 
   <script>
-    // 11箇所のポスター座標
+    // 12箇所のポスター座標
     const posters = [
       {id: 1, lat: 35.69434550142612, lon: 139.76133972813366, height: 12},
       {id: 2, lat: 35.720380861024076, lon: 139.76510042238093, height: 2.72},
@@ -142,7 +142,8 @@
       {id: 8, lat: 35.720145, lon: 139.765950, height: 2.7},
       {id: 9, lat: 35.719991, lon: 139.766207, height: 2.73},
       {id: 10, lat: 35.719865, lon: 139.766525, height: 2.89},
-      {id: 11, lat: 35.719580, lon: 139.766698, height: 3.24}
+      {id: 11, lat: 35.719580, lon: 139.766698, height: 3.24},
+      {id: 12, lat: 35.72055371958167, lon: 139.76531971465553, height: 3.24}
     ];
 
     let userLat = null;
@@ -152,8 +153,8 @@
     let posterImage = null;
     let headingAvailable = false;
     
-    // 表示距離（約10m以内）
-    const DISPLAY_RANGE = 0.0001;
+    // 表示距離（約50m以内）
+    const DISPLAY_RANGE = 0.0005;
     
     // カメラの視野角
     const CAMERA_FOV = 70;
