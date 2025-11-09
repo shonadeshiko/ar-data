@@ -125,25 +125,28 @@
     <div>位置: <span id="position">--</span></div>
     <div>方位: <span id="heading">--</span>°</div>
     <div>画像: <span id="image-status">読込中</span></div>
-    <div>表示範囲: 20m</div>
+    <div>表示範囲: 50m</div>
     <div>表示中: <span id="visible-count" class="warn">0</span>個</div>
   </div>
 
   <script>
     // 12箇所のポスター座標
+    // facing: ポスターが向いている方角（度）
+    //   0° = 北向き, 90° = 東向き, 180° = 南向き, 270° = 西向き
+    //   null = カメラに常に正対（ビルボード）
     const posters = [
-      {id: 1, lat: 35.69428376623254, lon: 139.76160202718992, height: 10},
-      {id: 2, lat: 35.720380861024076, lon: 139.76510042238093, height: 2.72},
-      {id: 3, lat: 35.720987, lon: 139.764194, height: 2.82},
-      {id: 4, lat: 35.720798, lon: 139.764362, height: 3.08},
-      {id: 5, lat: 35.720655, lon: 139.764665, height: 2.97},
-      {id: 6, lat: 35.720462, lon: 139.765279, height: 2.6},
-      {id: 7, lat: 35.720311, lon: 139.765584, height: 2.62},
-      {id: 8, lat: 35.720145, lon: 139.765950, height: 2.7},
-      {id: 9, lat: 35.719991, lon: 139.766207, height: 2.73},
-      {id: 10, lat: 35.719865, lon: 139.766525, height: 2.89},
-      {id: 11, lat: 35.719580, lon: 139.766698, height: 3.24},
-      {id: 12, lat: 35.72055371958167, lon: 139.76531971465553, height: 3.24}
+      {id: 1, lat: 35.683405, lon: 139.990764, height: 2.31, facing: 90},   // 東向き
+      {id: 2, lat: 35.683318, lon: 139.991631, height: 2.72, facing: 90},   // 東向き
+      {id: 3, lat: 35.683859, lon: 139.992339, height: 2.82, facing: 180},  // 南向き
+      {id: 4, lat: 35.68367, lon: 139.992507, height: 3.08, facing: 90},    // 東向き
+      {id: 5, lat: 35.683527, lon: 139.99281, height: 2.97, facing: 90},    // 東向き
+      {id: 6, lat: 35.683334, lon: 139.993424, height: 2.6, facing: 90},    // 東向き
+      {id: 7, lat: 35.683183, lon: 139.993729, height: 2.62, facing: 90},   // 東向き
+      {id: 8, lat: 35.683017, lon: 139.994095, height: 2.7, facing: 90},    // 東向き
+      {id: 9, lat: 35.682863, lon: 139.994352, height: 2.73, facing: 90},   // 東向き
+      {id: 10, lat: 35.682737, lon: 139.99467, height: 2.89, facing: 90},   // 東向き
+      {id: 11, lat: 35.682452, lon: 139.994843, height: 3.24, facing: 0},   // 北向き
+      {id: 12, lat: 35.683629, lon: 139.992651, height: 4.00, facing: null} // ビルボード（常に正対）
     ];
 
     let userLat = null;
@@ -153,8 +156,8 @@
     let posterImage = null;
     let headingAvailable = false;
     
-    // 表示距離（約20m以内）
-    const DISPLAY_RANGE = 0.0002;
+    // 表示距離（約50m以内）
+    const DISPLAY_RANGE = 0.0005;
     
     // カメラの視野角
     const CAMERA_FOV = 70;
@@ -228,7 +231,6 @@
           document.getElementById('position').textContent = 
             `${userLat.toFixed(6)}, ${userLon.toFixed(6)}`;
           
-          // ボタンを一度だけ更新
           const gpsButton = document.getElementById('gps-button');
           if (!gpsButton.disabled) {
             gpsButton.innerHTML = '✅ 位置情報取得完了';
@@ -248,7 +250,6 @@
     async function requestGyro() {
       if (typeof DeviceOrientationEvent !== 'undefined') {
         
-        // iOS 13+ の場合、明示的に許可を要求
         if (typeof DeviceOrientationEvent.requestPermission === 'function') {
           try {
             showMessage('ジャイロセンサーの許可を求めています...', 'success');
@@ -264,15 +265,13 @@
               startOrientation();
               console.log('✓ ジャイロセンサー許可');
             } else {
-              showMessage('⚠️ ジャイロセンサーが拒否されました。\n\niPhone設定:\n設定 > Safari > モーションと画面の向きのアクセス\nをオンにして、ページを再読み込みしてください。', 'error');
-              console.log('✗ ジャイロセンサー拒否');
+              showMessage('⚠️ ジャイロセンサーが拒否されました。', 'error');
             }
           } catch (err) {
-            showMessage('ジャイロセンサーエラー: ' + err.message + '\n\niPhone設定:\n設定 > Safari > モーションと画面の向きのアクセス\nを確認してください。', 'error');
+            showMessage('ジャイロセンサーエラー: ' + err.message, 'error');
             console.error('Permission error:', err);
           }
         } else {
-          // Android などの場合（許可不要）
           showMessage('ジャイロセンサーを起動しています...', 'success');
           startOrientation();
           document.getElementById('gyro-button').innerHTML = '✅ ジャイロセンサー有効化完了';
@@ -286,7 +285,6 @@
 
     // ジャイロセンサーのイベントリスナーを設定
     function startOrientation() {
-      // デバイスの絶対方位を取得
       window.addEventListener('deviceorientationabsolute', (event) => {
         if (event.absolute && event.alpha !== null) {
           heading = 360 - event.alpha;
@@ -296,7 +294,6 @@
         }
       });
       
-      // フォールバック（相対方位）
       window.addEventListener('deviceorientation', (event) => {
         if (event.alpha !== null && !headingAvailable) {
           heading = 360 - event.alpha;
@@ -305,11 +302,10 @@
         }
       });
       
-      // 3秒経っても方位が取得できない場合の警告
       setTimeout(() => {
         if (!headingAvailable && heading === 0) {
           document.getElementById('heading').innerHTML = '<span class="err">取得失敗</span>';
-          showMessage('⚠️ 方位情報が取得できません。スマホを動かしてみてください。', 'error');
+          showMessage('⚠️ 方位情報が取得できません。', 'error');
         }
       }, 3000);
     }
@@ -345,34 +341,44 @@
         posters.forEach(poster => {
           const distanceDeg = calculateDistanceDegree(userLat, userLon, poster.lat, poster.lon);
           
-          // 表示距離内かチェック
           if (distanceDeg > DISPLAY_RANGE) return;
           
           const bearing = calculateBearing(userLat, userLon, poster.lat, poster.lon);
           
-          // スマホの向きとポスターの方角の差を計算
           let angleDiff = bearing - heading;
           if (angleDiff > 180) angleDiff -= 360;
           if (angleDiff < -180) angleDiff += 360;
 
-          // カメラの視野角内にあるかチェック
           const halfFOV = CAMERA_FOV / 2;
           if (Math.abs(angleDiff) < halfFOV) {
             visibleCount++;
             
-            // 画面上の座標を計算
             const screenX = centerX + (angleDiff / halfFOV) * (canvas.width / 2);
             
-            // 距離に応じたスケール
             const minScale = 0.5;
             const maxScale = 3.0;
-            const scale = Math.max(minScale, Math.min(maxScale, (DISPLAY_RANGE * 0.8) / distanceDeg));
+            let scale = Math.max(minScale, Math.min(maxScale, (DISPLAY_RANGE * 0.8) / distanceDeg));
             
-            // ポスターサイズ
+            // ポスターの向きによる調整
+            if (poster.facing !== null) {
+              // ポスターが向いている方向と、ユーザーからポスターを見る方向の差
+              let viewAngle = (bearing + 180) % 360; // ポスターからユーザーを見る角度
+              let facingDiff = Math.abs(viewAngle - poster.facing);
+              if (facingDiff > 180) facingDiff = 360 - facingDiff;
+              
+              // 正面から見ると1.0、横から見ると0に近づく
+              const visibilityFactor = Math.cos(facingDiff * Math.PI / 180);
+              
+              // 横から見すぎると表示しない（60度以上）
+              if (Math.abs(facingDiff) > 60) return;
+              
+              // 幅を角度に応じて調整（横から見ると薄く）
+              scale *= Math.abs(visibilityFactor);
+            }
+            
             const posterWidth = 150 * scale;
             const posterHeight = 225 * scale;
             
-            // 高さの計算
             const eyeHeight = 1.6;
             const posterCenterHeight = poster.height;
             const distanceM = degreeToMeter(distanceDeg);
@@ -380,7 +386,6 @@
             const verticalAngle = Math.atan2(heightDiff, distanceM) * 180 / Math.PI;
             const screenY = centerY - (verticalAngle / 30) * canvas.height / 2;
             
-            // ポスター画像を描画
             ctx.save();
             const opacity = Math.max(0.8, Math.min(1.0, scale / 2.0));
             ctx.globalAlpha = opacity;
@@ -406,7 +411,6 @@
           }
         });
 
-        // 表示中のカウントを更新
         const countElem = document.getElementById('visible-count');
         countElem.textContent = visibleCount;
         countElem.className = visibleCount > 0 ? 'ok' : 'warn';
