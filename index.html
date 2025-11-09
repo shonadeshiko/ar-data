@@ -127,7 +127,6 @@
     <div>画像: <span id="image-status">読込中</span></div>
     <div>表示範囲: 25m</div>
     <div>表示中: <span id="visible-count" class="warn">0</span>個</div>
-    <div>最寄り: <span id="nearest">--</span></div>
   </div>
 
   <script>
@@ -228,7 +227,6 @@
           document.getElementById('gps-status').innerHTML = '<span class="ok">OK</span>';
           document.getElementById('position').textContent = 
             `${userLat.toFixed(6)}, ${userLon.toFixed(6)}`;
-          updateDebugInfo();
           
           if (!document.getElementById('gps-button').disabled) {
             document.getElementById('gps-button').innerHTML = '✅ 位置情報取得完了';
@@ -417,26 +415,6 @@
       draw();
     }
 
-    function updateDebugInfo() {
-      if (!userLat || !userLon) return;
-
-      let nearest = null;
-      let minDistance = Infinity;
-
-      posters.forEach(poster => {
-        const distanceDeg = calculateDistanceDegree(userLat, userLon, poster.lat, poster.lon);
-        if (distanceDeg < minDistance) {
-          minDistance = distanceDeg;
-          nearest = poster;
-        }
-      });
-
-      if (nearest) {
-        const distanceM = degreeToMeter(minDistance);
-        const inRange = minDistance < DISPLAY_RANGE;
-        document.getElementById('nearest').innerHTML = 
-          `ポスター${nearest.id} - ${distanceM.toFixed(0)}m <span class="${inRange ? 'ok' : 'warn'}">(${inRange ? '範囲内' : '範囲外'})</span>`;
-      }
     }
 
     // リサイズ対応
