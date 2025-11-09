@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>位置固定ARポスター</title>
+  <title>位置固定ARポスター（安定版）</title>
   <style>
     body { 
       margin: 0; 
@@ -120,33 +120,30 @@
   <canvas id="ar-canvas"></canvas>
   
   <div id="debug-info">
-    <div><strong>📱 デバッグ情報</strong></div>
+    <div><strong>📱 デバッグ情報（安定版）</strong></div>
     <div>GPS: <span id="gps-status">待機中</span></div>
     <div>位置: <span id="position">--</span></div>
     <div>方位: <span id="heading">--</span>°</div>
     <div>画像: <span id="image-status">読込中</span></div>
-    <div>表示範囲: 50m</div>
+    <div>表示範囲: 20m</div>
     <div>表示中: <span id="visible-count" class="warn">0</span>個</div>
   </div>
 
   <script>
     // 12箇所のポスター座標
-    // facing: ポスターが向いている方角（度）
-    //   0° = 北向き, 90° = 東向き, 180° = 南向き, 270° = 西向き
-    //   null = カメラに常に正対（ビルボード）
     const posters = [
-      {id: 1, lat: 35.69428539995229, lon: 139.76161879101878, height: 10, facing: 0},   // 北向き
-      {id: 2, lat: 35.683318, lon: 139.991631, height: 2.72, facing: 90},   // 東向き
-      {id: 3, lat: 35.683859, lon: 139.992339, height: 2.82, facing: 180},  // 南向き
-      {id: 4, lat: 35.68367, lon: 139.992507, height: 3.08, facing: 90},    // 東向き
-      {id: 5, lat: 35.683527, lon: 139.99281, height: 2.97, facing: 90},    // 東向き
-      {id: 6, lat: 35.683334, lon: 139.993424, height: 2.6, facing: 90},    // 東向き
-      {id: 7, lat: 35.683183, lon: 139.993729, height: 2.62, facing: 90},   // 東向き
-      {id: 8, lat: 35.683017, lon: 139.994095, height: 2.7, facing: 90},    // 東向き
-      {id: 9, lat: 35.682863, lon: 139.994352, height: 2.73, facing: 90},   // 東向き
-      {id: 10, lat: 35.682737, lon: 139.99467, height: 2.89, facing: 90},   // 東向き
-      {id: 11, lat: 35.682452, lon: 139.994843, height: 3.24, facing: 0},   // 北向き
-      {id: 12, lat: 35.683629, lon: 139.992651, height: 4.00, facing: null} // ビルボード（常に正対）
+      {id: 1, lat: 35.683405, lon: 139.990764, height: 2.31, facing: 90},
+      {id: 2, lat: 35.683318, lon: 139.991631, height: 2.72, facing: 90},
+      {id: 3, lat: 35.683859, lon: 139.992339, height: 2.82, facing: 180},
+      {id: 4, lat: 35.68367, lon: 139.992507, height: 3.08, facing: 90},
+      {id: 5, lat: 35.683527, lon: 139.99281, height: 2.97, facing: 90},
+      {id: 6, lat: 35.683334, lon: 139.993424, height: 2.6, facing: 90},
+      {id: 7, lat: 35.683183, lon: 139.993729, height: 2.62, facing: 90},
+      {id: 8, lat: 35.683017, lon: 139.994095, height: 2.7, facing: 90},
+      {id: 9, lat: 35.682863, lon: 139.994352, height: 2.73, facing: 90},
+      {id: 10, lat: 35.682737, lon: 139.99467, height: 2.89, facing: 90},
+      {id: 11, lat: 35.682452, lon: 139.994843, height: 3.24, facing: 0},
+      {id: 12, lat: 35.683629, lon: 139.992651, height: 4.00, facing: null}
     ];
 
     let userLat = null;
@@ -156,10 +153,18 @@
     let posterImage = null;
     let headingAvailable = false;
     
-    // 表示距離（約50m以内）
-    const DISPLAY_RANGE = 0.0005;
+    // スムージング用の変数
+    let smoothedLat = null;
+    let smoothedLon = null;
+    let smoothedHeading = null;
+    let headingHistory = [];
+    let positionHistory = [];
     
-    // カメラの視野角
+    // スムージングの設定
+    const HEADING_HISTORY_SIZE = 5;  // 方位の移動平均に使うサンプル数
+    const POSITION_HISTORY_SIZE = 3; // 位置の移動平均に使うサンプル数
+    
+    const DISPLAY_RANGE = 0.0002;  // 約20m以内
     const CAMERA_FOV = 70;
     
     // ポスター画像を読み込み
@@ -192,6 +197,52 @@
       const θ = Math.atan2(dLon, dLat);
       return (θ * 180 / Math.PI + 360) % 360;
     }
+    
+    // 方位のスムージング（角度の特性を考慮した移動平均）
+    function smoothHeading(newHeading) {
+      headingHistory.push(newHeading);
+      if (headingHistory.length > HEADING_HISTORY_SIZE) {
+        headingHistory.shift();
+      }
+      
+      if (headingHistory.length === 1) {
+        smoothedHeading = newHeading;
+        return smoothedHeading;
+      }
+      
+      // 角度の平均を計算（円周上の平均）
+      let sumSin = 0;
+      let sumCos = 0;
+      headingHistory.forEach(h => {
+        sumSin += Math.sin(h * Math.PI / 180);
+        sumCos += Math.cos(h * Math.PI / 180);
+      });
+      
+      const avgHeading = Math.atan2(sumSin, sumCos) * 180 / Math.PI;
+      smoothedHeading = (avgHeading + 360) % 360;
+      
+      return smoothedHeading;
+    }
+    
+    // 位置のスムージング（移動平均）
+    function smoothPosition(newLat, newLon) {
+      positionHistory.push({lat: newLat, lon: newLon});
+      if (positionHistory.length > POSITION_HISTORY_SIZE) {
+        positionHistory.shift();
+      }
+      
+      let sumLat = 0;
+      let sumLon = 0;
+      positionHistory.forEach(pos => {
+        sumLat += pos.lat;
+        sumLon += pos.lon;
+      });
+      
+      smoothedLat = sumLat / positionHistory.length;
+      smoothedLon = sumLon / positionHistory.length;
+      
+      return {lat: smoothedLat, lon: smoothedLon};
+    }
 
     // ステップ1: カメラ起動
     async function startCamera() {
@@ -207,9 +258,7 @@
         document.getElementById('gps-button').disabled = false;
         
         showMessage('カメラが起動しました', 'success');
-        console.log('✓ カメラ起動');
         
-        // Canvas初期化
         canvas = document.getElementById('ar-canvas');
         ctx = canvas.getContext('2d');
         canvas.width = window.innerWidth;
@@ -217,7 +266,6 @@
         
       } catch (err) {
         showMessage('カメラエラー: ' + err.message, 'error');
-        console.error('Camera error:', err);
       }
     }
 
@@ -227,9 +275,13 @@
         navigator.geolocation.watchPosition((position) => {
           userLat = position.coords.latitude;
           userLon = position.coords.longitude;
+          
+          // 位置のスムージング
+          smoothPosition(userLat, userLon);
+          
           document.getElementById('gps-status').innerHTML = '<span class="ok">OK</span>';
           document.getElementById('position').textContent = 
-            `${userLat.toFixed(6)}, ${userLon.toFixed(6)}`;
+            `${smoothedLat.toFixed(6)}, ${smoothedLon.toFixed(6)}`;
           
           const gpsButton = document.getElementById('gps-button');
           if (!gpsButton.disabled) {
@@ -241,12 +293,15 @@
         }, (err) => {
           document.getElementById('gps-status').innerHTML = '<span class="err">エラー</span>';
           showMessage('GPS エラー: ' + err.message, 'error');
-          console.error('GPS error:', err);
-        }, { enableHighAccuracy: true, maximumAge: 0 });
+        }, { 
+          enableHighAccuracy: true, 
+          maximumAge: 0,
+          timeout: 10000
+        });
       }
     }
 
-    // ステップ3: ジャイロセンサー許可を要求（iOS 13+対応）
+    // ステップ3: ジャイロセンサー許可を要求
     async function requestGyro() {
       if (typeof DeviceOrientationEvent !== 'undefined') {
         
@@ -263,13 +318,11 @@
               document.getElementById('close-button').disabled = false;
               
               startOrientation();
-              console.log('✓ ジャイロセンサー許可');
             } else {
               showMessage('⚠️ ジャイロセンサーが拒否されました。', 'error');
             }
           } catch (err) {
             showMessage('ジャイロセンサーエラー: ' + err.message, 'error');
-            console.error('Permission error:', err);
           }
         } else {
           showMessage('ジャイロセンサーを起動しています...', 'success');
@@ -278,8 +331,6 @@
           document.getElementById('gyro-button').disabled = true;
           document.getElementById('close-button').disabled = false;
         }
-      } else {
-        showMessage('このデバイスはジャイロセンサーに対応していません', 'error');
       }
     }
 
@@ -287,23 +338,25 @@
     function startOrientation() {
       window.addEventListener('deviceorientationabsolute', (event) => {
         if (event.absolute && event.alpha !== null) {
-          heading = 360 - event.alpha;
+          const rawHeading = 360 - event.alpha;
+          heading = smoothHeading(rawHeading);
           headingAvailable = true;
           document.getElementById('heading').innerHTML = 
-            `<span class="ok">${Math.round(heading)}</span>`;
+            `<span class="ok">${Math.round(smoothedHeading)}</span>`;
         }
       });
       
       window.addEventListener('deviceorientation', (event) => {
         if (event.alpha !== null && !headingAvailable) {
-          heading = 360 - event.alpha;
+          const rawHeading = 360 - event.alpha;
+          heading = smoothHeading(rawHeading);
           document.getElementById('heading').innerHTML = 
-            `<span class="warn">${Math.round(heading)}</span>`;
+            `<span class="warn">${Math.round(smoothedHeading)}</span>`;
         }
       });
       
       setTimeout(() => {
-        if (!headingAvailable && heading === 0) {
+        if (!headingAvailable && (smoothedHeading === null || smoothedHeading === 0)) {
           document.getElementById('heading').innerHTML = '<span class="err">取得失敗</span>';
           showMessage('⚠️ 方位情報が取得できません。', 'error');
         }
@@ -326,7 +379,7 @@
     // AR描画ループ
     function startAR() {
       function draw() {
-        if (!userLat || !userLon || !posterImage) {
+        if (!smoothedLat || !smoothedLon || !posterImage || smoothedHeading === null) {
           requestAnimationFrame(draw);
           return;
         }
@@ -337,15 +390,19 @@
         const centerY = canvas.height / 2;
         let visibleCount = 0;
 
-        // 全てのポスターをチェック
+        // スムージングされた位置と方位を使用
+        const currentLat = smoothedLat;
+        const currentLon = smoothedLon;
+        const currentHeading = smoothedHeading;
+
         posters.forEach(poster => {
-          const distanceDeg = calculateDistanceDegree(userLat, userLon, poster.lat, poster.lon);
+          const distanceDeg = calculateDistanceDegree(currentLat, currentLon, poster.lat, poster.lon);
           
           if (distanceDeg > DISPLAY_RANGE) return;
           
-          const bearing = calculateBearing(userLat, userLon, poster.lat, poster.lon);
+          const bearing = calculateBearing(currentLat, currentLon, poster.lat, poster.lon);
           
-          let angleDiff = bearing - heading;
+          let angleDiff = bearing - currentHeading;
           if (angleDiff > 180) angleDiff -= 360;
           if (angleDiff < -180) angleDiff += 360;
 
@@ -361,18 +418,14 @@
             
             // ポスターの向きによる調整
             if (poster.facing !== null) {
-              // ポスターが向いている方向と、ユーザーからポスターを見る方向の差
-              let viewAngle = (bearing + 180) % 360; // ポスターからユーザーを見る角度
+              let viewAngle = (bearing + 180) % 360;
               let facingDiff = Math.abs(viewAngle - poster.facing);
               if (facingDiff > 180) facingDiff = 360 - facingDiff;
               
-              // 正面から見ると1.0、横から見ると0に近づく
               const visibilityFactor = Math.cos(facingDiff * Math.PI / 180);
               
-              // 横から見すぎると表示しない（60度以上）
               if (Math.abs(facingDiff) > 60) return;
               
-              // 幅を角度に応じて調整（横から見ると薄く）
               scale *= Math.abs(visibilityFactor);
             }
             
